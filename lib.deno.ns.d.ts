@@ -11,8 +11,9 @@ declare namespace Deno {
   export function test(name: string, fn: TestFunction): void;
   export interface RunTestsOptions {
     exitOnFail?: boolean;
-    only?: RegExp;
-    skip?: RegExp;
+    failFast?: boolean;
+    only?: string | RegExp;
+    skip?: string | RegExp;
     disableLog?: boolean;
   }
   export function runTests(opts?: RunTestsOptions): Promise<void>;
@@ -39,11 +40,13 @@ declare namespace Deno {
     | "picture"
     | "public"
     | "template"
+    | "tmp"
     | "video";
   export function dir(kind: DirKind): string | null;
   export function execPath(): string;
   export function cwd(): string;
   export function chdir(directory: string): void;
+  export function umask(mask?: number): number;
   export const EOF: unique symbol;
   export type EOF = typeof EOF;
   export enum SeekMode {
@@ -67,10 +70,10 @@ declare namespace Deno {
     close(): void;
   }
   export interface Seeker {
-    seek(offset: number, whence: SeekMode): Promise<void>;
+    seek(offset: number, whence: SeekMode): Promise<number>;
   }
   export interface SyncSeeker {
-    seekSync(offset: number, whence: SeekMode): void;
+    seekSync(offset: number, whence: SeekMode): number;
   }
   export interface ReadCloser extends Reader, Closer {}
   export interface WriteCloser extends Writer, Closer {}
@@ -80,22 +83,26 @@ declare namespace Deno {
   export interface ReadWriteSeeker extends Reader, Writer, Seeker {}
   export function copy(dst: Writer, src: Reader): Promise<number>;
   export function toAsyncIterator(r: Reader): AsyncIterableIterator<Uint8Array>;
-  export function openSync(filename: string, options?: OpenOptions): File;
-  export function openSync(filename: string, mode?: OpenMode): File;
-  export function open(filename: string, options?: OpenOptions): Promise<File>;
-  export function open(filename: string, mode?: OpenMode): Promise<File>;
-  export function createSync(filename: string): File;
-  export function create(filename: string): Promise<File>;
+  export function openSync(path: string, options?: OpenOptions): File;
+  export function openSync(path: string, mode?: OpenMode): File;
+  export function open(path: string, options?: OpenOptions): Promise<File>;
+  export function open(path: string, mode?: OpenMode): Promise<File>;
+  export function createSync(path: string): File;
+  export function create(path: string): Promise<File>;
   export function readSync(rid: number, p: Uint8Array): number | EOF;
   export function read(rid: number, p: Uint8Array): Promise<number | EOF>;
   export function writeSync(rid: number, p: Uint8Array): number;
   export function write(rid: number, p: Uint8Array): Promise<number>;
-  export function seekSync(rid: number, offset: number, whence: SeekMode): void;
+  export function seekSync(
+    rid: number,
+    offset: number,
+    whence: SeekMode,
+  ): number;
   export function seek(
     rid: number,
     offset: number,
     whence: SeekMode,
-  ): Promise<void>;
+  ): Promise<number>;
   export function close(rid: number): void;
   export class File
     implements
@@ -113,8 +120,8 @@ declare namespace Deno {
     writeSync(p: Uint8Array): number;
     read(p: Uint8Array): Promise<number | EOF>;
     readSync(p: Uint8Array): number | EOF;
-    seek(offset: number, whence: SeekMode): Promise<void>;
-    seekSync(offset: number, whence: SeekMode): void;
+    seek(offset: number, whence: SeekMode): Promise<number>;
+    seekSync(offset: number, whence: SeekMode): number;
     close(): void;
   }
   export const stdin: File;
@@ -123,9 +130,9 @@ declare namespace Deno {
   export interface OpenOptions {
     read?: boolean;
     write?: boolean;
-    create?: boolean;
-    truncate?: boolean;
     append?: boolean;
+    truncate?: boolean;
+    create?: boolean;
     createNew?: boolean;
   }
   export type OpenMode = "r" | "r+" | "w" | "w+" | "a" | "a+" | "x" | "x+";
@@ -157,17 +164,17 @@ declare namespace Deno {
   export function readAllSync(r: SyncReader): Uint8Array;
   export function writeAll(w: Writer, arr: Uint8Array): Promise<void>;
   export function writeAllSync(w: SyncWriter, arr: Uint8Array): void;
-  export interface MkdirOption {
+  export interface MkdirOptions {
     recursive?: boolean;
     mode?: number;
   }
-  export function mkdirSync(path: string, options?: MkdirOption): void;
+  export function mkdirSync(path: string, options?: MkdirOptions): void;
   export function mkdirSync(
     path: string,
     recursive?: boolean,
     mode?: number,
   ): void;
-  export function mkdir(path: string, options?: MkdirOption): Promise<void>;
+  export function mkdir(path: string, options?: MkdirOptions): Promise<void>;
   export function mkdir(
     path: string,
     recursive?: boolean,
@@ -187,24 +194,24 @@ declare namespace Deno {
   export function chownSync(path: string, uid: number, gid: number): void;
   export function chown(path: string, uid: number, gid: number): Promise<void>;
   export function utimeSync(
-    filename: string,
+    path: string,
     atime: number | Date,
     mtime: number | Date,
   ): void;
   export function utime(
-    filename: string,
+    path: string,
     atime: number | Date,
     mtime: number | Date,
   ): Promise<void>;
-  export interface RemoveOption {
+  export interface RemoveOptions {
     recursive?: boolean;
   }
-  export function removeSync(path: string, options?: RemoveOption): void;
-  export function remove(path: string, options?: RemoveOption): Promise<void>;
+  export function removeSync(path: string, options?: RemoveOptions): void;
+  export function remove(path: string, options?: RemoveOptions): Promise<void>;
   export function renameSync(oldpath: string, newpath: string): void;
   export function rename(oldpath: string, newpath: string): Promise<void>;
-  export function readFileSync(filename: string): Uint8Array;
-  export function readFile(filename: string): Promise<Uint8Array>;
+  export function readFileSync(path: string): Uint8Array;
+  export function readFile(path: string): Promise<Uint8Array>;
   export interface FileInfo {
     len: number;
     modified: number | null;
@@ -226,16 +233,16 @@ declare namespace Deno {
   }
   export function realpathSync(path: string): string;
   export function realpath(path: string): Promise<string>;
-  export function readDirSync(path: string): FileInfo[];
-  export function readDir(path: string): Promise<FileInfo[]>;
-  export function copyFileSync(from: string, to: string): void;
-  export function copyFile(from: string, to: string): Promise<void>;
-  export function readlinkSync(name: string): string;
-  export function readlink(name: string): Promise<string>;
-  export function lstat(filename: string): Promise<FileInfo>;
-  export function lstatSync(filename: string): FileInfo;
-  export function stat(filename: string): Promise<FileInfo>;
-  export function statSync(filename: string): FileInfo;
+  export function readdirSync(path: string): FileInfo[];
+  export function readdir(path: string): Promise<FileInfo[]>;
+  export function copyFileSync(fromPath: string, toPath: string): void;
+  export function copyFile(fromPath: string, toPath: string): Promise<void>;
+  export function readlinkSync(path: string): string;
+  export function readlink(path: string): Promise<string>;
+  export function lstat(path: string): Promise<FileInfo>;
+  export function lstatSync(path: string): FileInfo;
+  export function stat(path: string): Promise<FileInfo>;
+  export function statSync(path: string): FileInfo;
   export function linkSync(oldname: string, newname: string): void;
   export function link(oldname: string, newname: string): Promise<void>;
   export function symlinkSync(
@@ -249,17 +256,17 @@ declare namespace Deno {
     type?: string,
   ): Promise<void>;
   export interface WriteFileOptions {
-    perm?: number;
-    create?: boolean;
     append?: boolean;
+    create?: boolean;
+    mode?: number;
   }
   export function writeFileSync(
-    filename: string,
+    path: string,
     data: Uint8Array,
     options?: WriteFileOptions,
   ): void;
   export function writeFile(
-    filename: string,
+    path: string,
     data: Uint8Array,
     options?: WriteFileOptions,
   ): Promise<void>;
@@ -284,7 +291,6 @@ declare namespace Deno {
     TimedOut: ErrorConstructor;
     Interrupted: ErrorConstructor;
     WriteZero: ErrorConstructor;
-    Other: ErrorConstructor;
     UnexpectedEof: ErrorConstructor;
     BadResource: ErrorConstructor;
     Http: ErrorConstructor;
@@ -371,14 +377,14 @@ declare namespace Deno {
   }
   export function shutdown(rid: number, how: ShutdownMode): void;
   export function recvfrom(rid: number, p: Uint8Array): Promise<[number, Addr]>;
-  export interface UDPConn extends AsyncIterator<[Uint8Array, Addr]> {
+  export interface UDPConn extends AsyncIterable<[Uint8Array, Addr]> {
     receive(p?: Uint8Array): Promise<[Uint8Array, Addr]>;
     send(p: Uint8Array, addr: UDPAddr): Promise<void>;
     close(): void;
     readonly addr: Addr;
     [Symbol.asyncIterator](): AsyncIterator<[Uint8Array, Addr]>;
   }
-  export interface Listener extends AsyncIterator<Conn> {
+  export interface Listener extends AsyncIterable<Conn> {
     accept(): Promise<Conn>;
     close(): void;
     readonly addr: Addr;
@@ -422,7 +428,13 @@ declare namespace Deno {
   export function connectTLS(options: ConnectTLSOptions): Promise<Conn>;
   export interface Metrics {
     opsDispatched: number;
+    opsDispatchedSync: number;
+    opsDispatchedAsync: number;
+    opsDispatchedAsyncUnref: number;
     opsCompleted: number;
+    opsCompletedSync: number;
+    opsCompletedAsync: number;
+    opsCompletedAsyncUnref: number;
     bytesSentControl: number;
     bytesSentData: number;
     bytesReceived: number;
