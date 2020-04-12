@@ -205,11 +205,6 @@ declare namespace Deno {
   export function isatty(rid: number): boolean;
   export function setRaw(rid: number, mode: boolean): void;
   export class Buffer implements Reader, SyncReader, Writer, SyncWriter {
-    private buf;
-    private off;
-    private _tryGrowByReslice;
-    private _reslice;
-    private _grow;
     constructor(ab?: ArrayBuffer);
     bytes(): Uint8Array;
     toString(): string;
@@ -425,27 +420,25 @@ declare namespace Deno {
     };
   }
   export function openPlugin(filename: string): Plugin;
-  export type Transport = "tcp" | "udp";
-  export interface Addr {
-    transport: Transport;
+  export interface NetAddr {
+    transport: "tcp" | "udp";
     hostname: string;
     port: number;
   }
-  export interface UDPAddr {
-    port: number;
-    transport?: Transport;
-    hostname?: string;
+  export interface UnixAddr {
+    transport: "unix" | "unixpacket";
+    address: string;
   }
+  export type Addr = NetAddr | UnixAddr;
   export enum ShutdownMode {
     Read = 0,
     Write,
     ReadWrite,
   }
   export function shutdown(rid: number, how: ShutdownMode): void;
-  export function recvfrom(rid: number, p: Uint8Array): Promise<[number, Addr]>;
-  export interface UDPConn extends AsyncIterable<[Uint8Array, Addr]> {
+  export interface DatagramConn extends AsyncIterable<[Uint8Array, Addr]> {
     receive(p?: Uint8Array): Promise<[Uint8Array, Addr]>;
-    send(p: Uint8Array, addr: UDPAddr): Promise<void>;
+    send(p: Uint8Array, addr: Addr): Promise<void>;
     close(): void;
     readonly addr: Addr;
     [Symbol.asyncIterator](): AsyncIterator<[Uint8Array, Addr]>;
@@ -466,26 +459,40 @@ declare namespace Deno {
   export interface ListenOptions {
     port: number;
     hostname?: string;
-    transport?: Transport;
+  }
+  export interface UnixListenOptions {
+    address: string;
   }
   export function listen(
     options: ListenOptions & { transport?: "tcp" },
   ): Listener;
   export function listen(
+    options: UnixListenOptions & { transport: "unix" },
+  ): Listener;
+  export function listen(
     options: ListenOptions & { transport: "udp" },
-  ): UDPConn;
-  export function listen(options: ListenOptions): Listener | UDPConn;
+  ): DatagramConn;
+  export function listen(
+    options: UnixListenOptions & { transport: "unixpacket" },
+  ): DatagramConn;
   export interface ListenTLSOptions extends ListenOptions {
     certFile: string;
     keyFile: string;
+    transport?: "tcp";
   }
   export function listenTLS(options: ListenTLSOptions): Listener;
   export interface ConnectOptions {
     port: number;
     hostname?: string;
-    transport?: Transport;
+    transport?: "tcp";
   }
-  export function connect(options: ConnectOptions): Promise<Conn>;
+  export interface UnixConnectOptions {
+    transport: "unix";
+    address: string;
+  }
+  export function connect(
+    options: ConnectOptions | UnixConnectOptions,
+  ): Promise<Conn>;
   export interface ConnectTLSOptions {
     port: number;
     hostname?: string;
@@ -615,13 +622,13 @@ declare namespace Deno {
     SIGUSR2 = 31,
   }
   export const Signal: typeof MacOSSignal | typeof LinuxSignal;
-  interface ConsoleOptions {
+  interface InspectOptions {
     showHidden?: boolean;
     depth?: number;
     colors?: boolean;
     indentLevel?: number;
   }
-  export function inspect(value: unknown, options?: ConsoleOptions): string;
+  export function inspect(value: unknown, options?: InspectOptions): string;
   export type OperatingSystem = "mac" | "win" | "linux";
   export type Arch = "x64" | "arm64";
   interface BuildInfo {
