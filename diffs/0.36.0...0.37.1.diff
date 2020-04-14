@@ -1,0 +1,151 @@
+diff --git a/lib.deno.ns.d.ts b/lib.deno.ns.d.ts
+index aba0b2d..5db0800 100644
+--- a/lib.deno.ns.d.ts
++++ b/lib.deno.ns.d.ts
+@@ -5,18 +5,83 @@ declare namespace Deno {
+   export interface TestDefinition {
+     fn: TestFunction;
+     name: string;
++    ignore?: boolean;
++    disableOpSanitizer?: boolean;
++    disableResourceSanitizer?: boolean;
+   }
+   export function test(t: TestDefinition): void;
+   export function test(fn: TestFunction): void;
+   export function test(name: string, fn: TestFunction): void;
++  enum TestStatus {
++    Passed = "passed",
++    Failed = "failed",
++    Ignored = "ignored",
++  }
++  interface TestResult {
++    name: string;
++    status: TestStatus;
++    duration?: number;
++    error?: Error;
++  }
++  interface TestStats {
++    filtered: number;
++    ignored: number;
++    measured: number;
++    passed: number;
++    failed: number;
++  }
++  export enum TestEvent {
++    Start = "start",
++    TestStart = "testStart",
++    TestEnd = "testEnd",
++    End = "end",
++  }
++  interface TestEventStart {
++    kind: TestEvent.Start;
++    tests: number;
++  }
++  interface TestEventTestStart {
++    kind: TestEvent.TestStart;
++    name: string;
++  }
++  interface TestEventTestEnd {
++    kind: TestEvent.TestEnd;
++    result: TestResult;
++  }
++  interface TestEventEnd {
++    kind: TestEvent.End;
++    stats: TestStats;
++    duration: number;
++    results: TestResult[];
++  }
++  interface TestReporter {
++    start(event: TestEventStart): Promise<void>;
++    testStart(msg: TestEventTestStart): Promise<void>;
++    testEnd(msg: TestEventTestEnd): Promise<void>;
++    end(event: TestEventEnd): Promise<void>;
++  }
++  export class ConsoleTestReporter implements TestReporter {
++    constructor();
++    start(event: TestEventStart): Promise<void>;
++    testStart(msg: TestEventTestStart): Promise<void>;
++    testEnd(msg: TestEventTestEnd): Promise<void>;
++    end(event: TestEventEnd): Promise<void>;
++  }
+   export interface RunTestsOptions {
+     exitOnFail?: boolean;
+     failFast?: boolean;
+     only?: string | RegExp;
+     skip?: string | RegExp;
+     disableLog?: boolean;
+-  }
+-  export function runTests(opts?: RunTestsOptions): Promise<void>;
++    reporter?: TestReporter;
++  }
++  export function runTests(
++    opts?: RunTestsOptions,
++  ): Promise<{
++    results: TestResult[];
++    stats: TestStats;
++    duration: number;
++  }>;
+   export function loadavg(): number[];
+   export function hostname(): string;
+   export function osRelease(): string;
+@@ -84,9 +149,9 @@ declare namespace Deno {
+   export function copy(dst: Writer, src: Reader): Promise<number>;
+   export function toAsyncIterator(r: Reader): AsyncIterableIterator<Uint8Array>;
+   export function openSync(path: string, options?: OpenOptions): File;
+-  export function openSync(path: string, mode?: OpenMode): File;
++  export function openSync(path: string, openMode?: OpenMode): File;
+   export function open(path: string, options?: OpenOptions): Promise<File>;
+-  export function open(path: string, mode?: OpenMode): Promise<File>;
++  export function open(path: string, openMode?: OpenMode): Promise<File>;
+   export function createSync(path: string): File;
+   export function create(path: string): Promise<File>;
+   export function readSync(rid: number, p: Uint8Array): number | EOF;
+@@ -134,6 +199,7 @@ declare namespace Deno {
+     truncate?: boolean;
+     create?: boolean;
+     createNew?: boolean;
++    mode?: number;
+   }
+   export type OpenMode = "r" | "r+" | "w" | "w+" | "a" | "a+" | "x" | "x+";
+   export function isatty(rid: number): boolean;
+@@ -213,7 +279,7 @@ declare namespace Deno {
+   export function readFileSync(path: string): Uint8Array;
+   export function readFile(path: string): Promise<Uint8Array>;
+   export interface FileInfo {
+-    len: number;
++    size: number;
+     modified: number | null;
+     accessed: number | null;
+     created: number | null;
+@@ -243,16 +309,16 @@ declare namespace Deno {
+   export function lstatSync(path: string): FileInfo;
+   export function stat(path: string): Promise<FileInfo>;
+   export function statSync(path: string): FileInfo;
+-  export function linkSync(oldname: string, newname: string): void;
+-  export function link(oldname: string, newname: string): Promise<void>;
++  export function linkSync(oldpath: string, newpath: string): void;
++  export function link(oldpath: string, newpath: string): Promise<void>;
+   export function symlinkSync(
+-    oldname: string,
+-    newname: string,
++    oldpath: string,
++    newpath: string,
+     type?: string,
+   ): void;
+   export function symlink(
+-    oldname: string,
+-    newname: string,
++    oldpath: string,
++    newpath: string,
+     type?: string,
+   ): Promise<void>;
+   export interface WriteFileOptions {
+@@ -472,7 +538,7 @@ declare namespace Deno {
+     signal?: number;
+   }
+   export interface RunOptions {
+-    args: string[];
++    cmd: string[];
+     cwd?: string;
+     env?: {
+       [key: string]: string;

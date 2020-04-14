@@ -1,0 +1,546 @@
+diff --git a/lib.deno.ns.d.ts b/lib.deno.ns.d.ts
+index aba0b2d..d93f3c0 100644
+--- a/lib.deno.ns.d.ts
++++ b/lib.deno.ns.d.ts
+@@ -5,18 +5,83 @@ declare namespace Deno {
+   export interface TestDefinition {
+     fn: TestFunction;
+     name: string;
++    ignore?: boolean;
++    disableOpSanitizer?: boolean;
++    disableResourceSanitizer?: boolean;
+   }
+   export function test(t: TestDefinition): void;
+   export function test(fn: TestFunction): void;
+   export function test(name: string, fn: TestFunction): void;
++  enum TestStatus {
++    Passed = "passed",
++    Failed = "failed",
++    Ignored = "ignored",
++  }
++  interface TestResult {
++    name: string;
++    status: TestStatus;
++    duration?: number;
++    error?: Error;
++  }
++  interface TestStats {
++    filtered: number;
++    ignored: number;
++    measured: number;
++    passed: number;
++    failed: number;
++  }
++  export enum TestEvent {
++    Start = "start",
++    TestStart = "testStart",
++    TestEnd = "testEnd",
++    End = "end",
++  }
++  interface TestEventStart {
++    kind: TestEvent.Start;
++    tests: number;
++  }
++  interface TestEventTestStart {
++    kind: TestEvent.TestStart;
++    name: string;
++  }
++  interface TestEventTestEnd {
++    kind: TestEvent.TestEnd;
++    result: TestResult;
++  }
++  interface TestEventEnd {
++    kind: TestEvent.End;
++    stats: TestStats;
++    duration: number;
++    results: TestResult[];
++  }
++  interface TestReporter {
++    start(event: TestEventStart): Promise<void>;
++    testStart(msg: TestEventTestStart): Promise<void>;
++    testEnd(msg: TestEventTestEnd): Promise<void>;
++    end(event: TestEventEnd): Promise<void>;
++  }
++  export class ConsoleTestReporter implements TestReporter {
++    constructor();
++    start(event: TestEventStart): Promise<void>;
++    testStart(msg: TestEventTestStart): Promise<void>;
++    testEnd(msg: TestEventTestEnd): Promise<void>;
++    end(event: TestEventEnd): Promise<void>;
++  }
+   export interface RunTestsOptions {
+     exitOnFail?: boolean;
+     failFast?: boolean;
+     only?: string | RegExp;
+     skip?: string | RegExp;
+     disableLog?: boolean;
+-  }
+-  export function runTests(opts?: RunTestsOptions): Promise<void>;
++    reporter?: TestReporter;
++  }
++  export function runTests(
++    opts?: RunTestsOptions,
++  ): Promise<{
++    results: TestResult[];
++    stats: TestStats;
++    duration: number;
++  }>;
+   export function loadavg(): number[];
+   export function hostname(): string;
+   export function osRelease(): string;
+@@ -84,9 +149,9 @@ declare namespace Deno {
+   export function copy(dst: Writer, src: Reader): Promise<number>;
+   export function toAsyncIterator(r: Reader): AsyncIterableIterator<Uint8Array>;
+   export function openSync(path: string, options?: OpenOptions): File;
+-  export function openSync(path: string, mode?: OpenMode): File;
++  export function openSync(path: string, openMode?: OpenMode): File;
+   export function open(path: string, options?: OpenOptions): Promise<File>;
+-  export function open(path: string, mode?: OpenMode): Promise<File>;
++  export function open(path: string, openMode?: OpenMode): Promise<File>;
+   export function createSync(path: string): File;
+   export function create(path: string): Promise<File>;
+   export function readSync(rid: number, p: Uint8Array): number | EOF;
+@@ -134,16 +199,12 @@ declare namespace Deno {
+     truncate?: boolean;
+     create?: boolean;
+     createNew?: boolean;
++    mode?: number;
+   }
+   export type OpenMode = "r" | "r+" | "w" | "w+" | "a" | "a+" | "x" | "x+";
+   export function isatty(rid: number): boolean;
+   export function setRaw(rid: number, mode: boolean): void;
+   export class Buffer implements Reader, SyncReader, Writer, SyncWriter {
+-    private buf;
+-    private off;
+-    private _tryGrowByReslice;
+-    private _reslice;
+-    private _grow;
+     constructor(ab?: ArrayBuffer);
+     bytes(): Uint8Array;
+     toString(): string;
+@@ -213,7 +274,7 @@ declare namespace Deno {
+   export function readFileSync(path: string): Uint8Array;
+   export function readFile(path: string): Promise<Uint8Array>;
+   export interface FileInfo {
+-    len: number;
++    size: number;
+     modified: number | null;
+     accessed: number | null;
+     created: number | null;
+@@ -243,16 +304,16 @@ declare namespace Deno {
+   export function lstatSync(path: string): FileInfo;
+   export function stat(path: string): Promise<FileInfo>;
+   export function statSync(path: string): FileInfo;
+-  export function linkSync(oldname: string, newname: string): void;
+-  export function link(oldname: string, newname: string): Promise<void>;
++  export function linkSync(oldpath: string, newpath: string): void;
++  export function link(oldpath: string, newpath: string): Promise<void>;
+   export function symlinkSync(
+-    oldname: string,
+-    newname: string,
++    oldpath: string,
++    newpath: string,
+     type?: string,
+   ): void;
+   export function symlink(
+-    oldname: string,
+-    newname: string,
++    oldpath: string,
++    newpath: string,
+     type?: string,
+   ): Promise<void>;
+   export interface WriteFileOptions {
+@@ -359,27 +420,25 @@ declare namespace Deno {
+     };
+   }
+   export function openPlugin(filename: string): Plugin;
+-  export type Transport = "tcp" | "udp";
+-  export interface Addr {
+-    transport: Transport;
++  export interface NetAddr {
++    transport: "tcp" | "udp";
+     hostname: string;
+     port: number;
+   }
+-  export interface UDPAddr {
+-    port: number;
+-    transport?: Transport;
+-    hostname?: string;
++  export interface UnixAddr {
++    transport: "unix" | "unixpacket";
++    address: string;
+   }
++  export type Addr = NetAddr | UnixAddr;
+   export enum ShutdownMode {
+     Read = 0,
+     Write,
+     ReadWrite,
+   }
+   export function shutdown(rid: number, how: ShutdownMode): void;
+-  export function recvfrom(rid: number, p: Uint8Array): Promise<[number, Addr]>;
+-  export interface UDPConn extends AsyncIterable<[Uint8Array, Addr]> {
++  export interface DatagramConn extends AsyncIterable<[Uint8Array, Addr]> {
+     receive(p?: Uint8Array): Promise<[Uint8Array, Addr]>;
+-    send(p: Uint8Array, addr: UDPAddr): Promise<void>;
++    send(p: Uint8Array, addr: Addr): Promise<void>;
+     close(): void;
+     readonly addr: Addr;
+     [Symbol.asyncIterator](): AsyncIterator<[Uint8Array, Addr]>;
+@@ -400,26 +459,40 @@ declare namespace Deno {
+   export interface ListenOptions {
+     port: number;
+     hostname?: string;
+-    transport?: Transport;
++  }
++  export interface UnixListenOptions {
++    address: string;
+   }
+   export function listen(
+     options: ListenOptions & { transport?: "tcp" },
+   ): Listener;
++  export function listen(
++    options: UnixListenOptions & { transport: "unix" },
++  ): Listener;
+   export function listen(
+     options: ListenOptions & { transport: "udp" },
+-  ): UDPConn;
+-  export function listen(options: ListenOptions): Listener | UDPConn;
++  ): DatagramConn;
++  export function listen(
++    options: UnixListenOptions & { transport: "unixpacket" },
++  ): DatagramConn;
+   export interface ListenTLSOptions extends ListenOptions {
+     certFile: string;
+     keyFile: string;
++    transport?: "tcp";
+   }
+   export function listenTLS(options: ListenTLSOptions): Listener;
+   export interface ConnectOptions {
+     port: number;
+     hostname?: string;
+-    transport?: Transport;
++    transport?: "tcp";
++  }
++  export interface UnixConnectOptions {
++    transport: "unix";
++    address: string;
+   }
+-  export function connect(options: ConnectOptions): Promise<Conn>;
++  export function connect(
++    options: ConnectOptions | UnixConnectOptions,
++  ): Promise<Conn>;
+   export interface ConnectTLSOptions {
+     port: number;
+     hostname?: string;
+@@ -472,7 +545,7 @@ declare namespace Deno {
+     signal?: number;
+   }
+   export interface RunOptions {
+-    args: string[];
++    cmd: string[];
+     cwd?: string;
+     env?: {
+       [key: string]: string;
+@@ -549,13 +622,13 @@ declare namespace Deno {
+     SIGUSR2 = 31,
+   }
+   export const Signal: typeof MacOSSignal | typeof LinuxSignal;
+-  interface ConsoleOptions {
++  interface InspectOptions {
+     showHidden?: boolean;
+     depth?: number;
+     colors?: boolean;
+     indentLevel?: number;
+   }
+-  export function inspect(value: unknown, options?: ConsoleOptions): string;
++  export function inspect(value: unknown, options?: InspectOptions): string;
+   export type OperatingSystem = "mac" | "win" | "linux";
+   export type Arch = "x64" | "arm64";
+   interface BuildInfo {
+diff --git a/lib.deno.shared_globals.d.ts b/lib.deno.shared_globals.d.ts
+index 6922669..9c0b9b4 100644
+--- a/lib.deno.shared_globals.d.ts
++++ b/lib.deno.shared_globals.d.ts
+@@ -4,8 +4,8 @@ declare interface WindowOrWorkerGlobalScope {
+   clearInterval: typeof __timers.clearInterval;
+   clearTimeout: typeof __timers.clearTimeout;
+   fetch: typeof __fetch.fetch;
+-  queueMicrotask: (task: () => void) => void;
+   setInterval: typeof __timers.setInterval;
++  queueMicrotask: typeof __timers.queueMicrotask;
+   setTimeout: typeof __timers.setTimeout;
+   console: __console.Console;
+   Blob: typeof __blob.DenoBlob;
+@@ -130,6 +130,7 @@ declare const clearTimeout: typeof __timers.clearTimeout;
+ declare const fetch: typeof __fetch.fetch;
+ declare const setInterval: typeof __timers.setInterval;
+ declare const setTimeout: typeof __timers.setTimeout;
++declare const queueMicrotask: typeof __timers.queueMicrotask;
+ declare const console: __console.Console;
+ declare const Blob: typeof __blob.DenoBlob;
+ declare const File: __domTypes.DomFileConstructor;
+@@ -233,10 +234,6 @@ declare namespace __domTypes {
+     TEXT_NODE = 3,
+     DOCUMENT_FRAGMENT_NODE = 11,
+   }
+-  export const eventTargetHost: unique symbol;
+-  export const eventTargetListeners: unique symbol;
+-  export const eventTargetMode: unique symbol;
+-  export const eventTargetNodeType: unique symbol;
+   export interface EventListener {
+     (evt: Event): void | Promise<void>;
+   }
+@@ -250,11 +247,11 @@ declare namespace __domTypes {
+     callback: EventListenerOrEventListenerObject;
+     options: AddEventListenerOptions;
+   }
++  export const eventTargetHost: unique symbol;
++  export const eventTargetListeners: unique symbol;
++  export const eventTargetMode: unique symbol;
++  export const eventTargetNodeType: unique symbol;
+   export interface EventTarget {
+-    [eventTargetHost]: EventTarget | null;
+-    [eventTargetListeners]: { [type in string]: EventListener[] };
+-    [eventTargetMode]: string;
+-    [eventTargetNodeType]: NodeType;
+     addEventListener(
+       type: string,
+       callback: EventListenerOrEventListenerObject | null,
+@@ -392,16 +389,62 @@ declare namespace __domTypes {
+       options?: boolean | EventListenerOptions,
+     ): void;
+   }
+-  export interface ReadableStream {
++  export interface ReadableStreamReadDoneResult<T> {
++    done: true;
++    value?: T;
++  }
++  export interface ReadableStreamReadValueResult<T> {
++    done: false;
++    value: T;
++  }
++  export type ReadableStreamReadResult<T> =
++    | ReadableStreamReadValueResult<T>
++    | ReadableStreamReadDoneResult<T>;
++  export interface ReadableStreamDefaultReader<R = any> {
++    readonly closed: Promise<void>;
++    cancel(reason?: any): Promise<void>;
++    read(): Promise<ReadableStreamReadResult<R>>;
++    releaseLock(): void;
++  }
++  export interface PipeOptions {
++    preventAbort?: boolean;
++    preventCancel?: boolean;
++    preventClose?: boolean;
++    signal?: AbortSignal;
++  }
++  export interface ReadableStream<R = any> {
+     readonly locked: boolean;
+-    cancel(): Promise<void>;
+-    getReader(): ReadableStreamReader;
+-    tee(): [ReadableStream, ReadableStream];
++    cancel(reason?: any): Promise<void>;
++    getReader(options: { mode: "byob" }): ReadableStreamBYOBReader;
++    getReader(): ReadableStreamDefaultReader<R>;
++    tee(): [ReadableStream<R>, ReadableStream<R>];
++  }
++  export interface ReadableStreamReader<R = any> {
++    cancel(reason: any): Promise<void>;
++    read(): Promise<ReadableStreamReadResult<R>>;
++    releaseLock(): void;
+   }
+-  export interface ReadableStreamReader {
+-    cancel(): Promise<void>;
+-    read(): Promise<any>;
++  export interface ReadableStreamBYOBReader {
++    readonly closed: Promise<void>;
++    cancel(reason?: any): Promise<void>;
++    read<T extends ArrayBufferView>(
++      view: T,
++    ): Promise<ReadableStreamReadResult<T>>;
++    releaseLock(): void;
++  }
++  export interface WritableStream<W = any> {
++    readonly locked: boolean;
++    abort(reason?: any): Promise<void>;
++    getWriter(): WritableStreamDefaultWriter<W>;
++  }
++  export interface WritableStreamDefaultWriter<W = any> {
++    readonly closed: Promise<void>;
++    readonly desiredSize: number | null;
++    readonly ready: Promise<void>;
++    abort(reason?: any): Promise<void>;
++    close(): Promise<void>;
+     releaseLock(): void;
++    write(chunk: W): Promise<void>;
+   }
+   export interface FormData extends DomIterable<string, FormDataEntryValue> {
+     append(name: string, value: string | Blob, fileName?: string): void;
+@@ -421,7 +464,7 @@ declare namespace __domTypes {
+     slice(start?: number, end?: number, contentType?: string): Blob;
+   }
+   export interface Body {
+-    readonly body: ReadableStream | null;
++    readonly body: ReadableStream<Uint8Array> | null;
+     readonly bodyUsed: boolean;
+     arrayBuffer(): Promise<ArrayBuffer>;
+     blob(): Promise<Blob>;
+@@ -537,12 +580,19 @@ declare namespace __domTypes {
+     readonly url: string;
+     clone(): Response;
+   }
++  export interface DOMStringList {
++    readonly length: number;
++    contains(string: string): boolean;
++    item(index: number): string | null;
++    [index: number]: string;
++  }
+   export interface Location {
+-    readonly ancestorOrigins: string[];
++    readonly ancestorOrigins: DOMStringList;
+     hash: string;
+     host: string;
+     hostname: string;
+     href: string;
++    toString(): string;
+     readonly origin: string;
+     pathname: string;
+     port: string;
+@@ -550,15 +600,11 @@ declare namespace __domTypes {
+     search: string;
+     assign(url: string): void;
+     reload(): void;
+-    reload(forcedReload: boolean): void;
+     replace(url: string): void;
+   }
+ }
+ declare namespace __blob {
+-  export const bytesSymbol: unique symbol;
+-  export const blobBytesWeakMap: WeakMap<__domTypes.Blob, Uint8Array>;
+   export class DenoBlob implements __domTypes.Blob {
+-    private readonly [bytesSymbol];
+     readonly size: number;
+     readonly type: string;
+     constructor(
+@@ -569,7 +615,7 @@ declare namespace __blob {
+   }
+ }
+ declare namespace __console {
+-  type ConsoleOptions = Partial<{
++  type InspectOptions = Partial<{
+     showHidden: boolean;
+     depth: number;
+     colors: boolean;
+@@ -581,7 +627,6 @@ declare namespace __console {
+   }
+   const isConsoleInstance: unique symbol;
+   export class Console {
+-    private printFunc;
+     indentLevel: number;
+     [isConsoleInstance]: boolean;
+     log: (...args: unknown[]) => void;
+@@ -622,7 +667,7 @@ declare namespace __console {
+     static [Symbol.hasInstance](instance: Console): boolean;
+   }
+   export const customInspect: unique symbol;
+-  export function inspect(value: unknown, options?: ConsoleOptions): string;
++  export function inspect(value: unknown, options?: InspectOptions): string;
+ }
+ declare namespace __event {
+   export const eventAttributes: WeakMap<object, any>;
+@@ -782,16 +827,16 @@ declare namespace __io {
+ }
+ declare namespace __fetch {
+   class Body
+-    implements __domTypes.Body, __domTypes.ReadableStream, __io.ReadCloser {
+-    private rid;
++    implements
++      __domTypes.Body,
++      __domTypes.ReadableStream<Uint8Array>,
++      __io.ReadCloser
++  {
+     readonly contentType: string;
+     bodyUsed: boolean;
+-    private _bodyPromise;
+-    private _data;
+     readonly locked: boolean;
+-    readonly body: null | Body;
++    readonly body: __domTypes.ReadableStream<Uint8Array>;
+     constructor(rid: number, contentType: string);
+-    private _bodyBuffer;
+     arrayBuffer(): Promise<ArrayBuffer>;
+     blob(): Promise<__domTypes.Blob>;
+     formData(): Promise<__domTypes.FormData>;
+@@ -800,7 +845,9 @@ declare namespace __fetch {
+     read(p: Uint8Array): Promise<number | Deno.EOF>;
+     close(): void;
+     cancel(): Promise<void>;
+-    getReader(): __domTypes.ReadableStreamReader;
++    getReader(options: { mode: "byob" }): __domTypes.ReadableStreamBYOBReader;
++    getReader(): __domTypes.ReadableStreamDefaultReader<Uint8Array>;
++    getReader(): __domTypes.ReadableStreamBYOBReader;
+     tee(): [__domTypes.ReadableStream, __domTypes.ReadableStream];
+     [Symbol.asyncIterator](): AsyncIterableIterator<Uint8Array>;
+   }
+@@ -849,7 +896,6 @@ declare namespace __textEncoding {
+     ignoreBOM?: boolean;
+   }
+   export class TextDecoder {
+-    private _encoding;
+     readonly encoding: string;
+     readonly fatal: boolean;
+     readonly ignoreBOM = false;
+@@ -885,13 +931,11 @@ declare namespace __timers {
+   ): number;
+   export function clearTimeout(id?: number): void;
+   export function clearInterval(id?: number): void;
++  export function queueMicrotask(func: Function): void;
+ }
+ declare namespace __urlSearchParams {
+   export class URLSearchParams {
+-    private params;
+-    private url;
+     constructor(init?: string | string[][] | Record<string, string>);
+-    private updateSteps;
+     append(name: string, value: string): void;
+     delete(name: string): void;
+     getAll(name: string): string[];
+@@ -908,8 +952,6 @@ declare namespace __urlSearchParams {
+     entries(): IterableIterator<[string, string]>;
+     [Symbol.iterator](): IterableIterator<[string, string]>;
+     toString(): string;
+-    private _handleStringInitialization;
+-    private _handleArrayInitialization;
+   }
+ }
+ declare namespace __url {
+@@ -949,16 +991,12 @@ declare namespace __workers {
+     name?: string;
+   }
+   export class WorkerImpl implements Worker {
+-    private readonly id;
+-    private isClosing;
+-    private readonly isClosedPromise;
+     onerror?: (e: Event) => void;
+     onmessage?: (data: any) => void;
+     onmessageerror?: () => void;
+     constructor(specifier: string, options?: WorkerOptions);
+     postMessage(data: any): void;
+     terminate(): void;
+-    private run;
+   }
+ }
+ declare namespace __performanceUtil {
+diff --git a/lib.deno.window.d.ts b/lib.deno.window.d.ts
+index 282d35a..aa000ab 100644
+--- a/lib.deno.window.d.ts
++++ b/lib.deno.window.d.ts
+@@ -4,6 +4,8 @@ declare interface Window extends WindowOrWorkerGlobalScope {
+   onload: Function | undefined;
+   onunload: Function | undefined;
+   crypto: Crypto;
++  close: () => void;
++  closed: boolean;
+   Deno: typeof Deno;
+ }
+ declare const window: Window & WindowOrWorkerGlobalScope & typeof globalThis;
