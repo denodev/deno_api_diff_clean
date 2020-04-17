@@ -1,16 +1,14 @@
-declare interface DedicatedWorkerGlobalScope extends WindowOrWorkerGlobalScope {
-  self: DedicatedWorkerGlobalScope
-    & WindowOrWorkerGlobalScope
-    & typeof globalThis;
-  onmessage: (e: { data: any }) => void;
+declare interface DedicatedWorkerGlobalScope {
+  self: DedicatedWorkerGlobalScope & typeof globalThis;
+  onmessage: (e: MessageEvent) => void;
+  onmessageerror: (e: MessageEvent) => void;
+  location: Location;
   onerror: undefined | typeof onerror;
   name: typeof __workerMain.name;
   close: typeof __workerMain.close;
   postMessage: typeof __workerMain.postMessage;
 }
-declare const self: DedicatedWorkerGlobalScope
-  & WindowOrWorkerGlobalScope
-  & typeof globalThis;
+declare const self: DedicatedWorkerGlobalScope & typeof globalThis;
 declare let onmessage: ((e: { data: any }) => Promise<void> | void) | undefined;
 declare let onerror:
   | ((

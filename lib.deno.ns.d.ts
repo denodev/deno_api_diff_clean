@@ -194,17 +194,7 @@ declare namespace Deno {
     mode?: number;
   }
   export function mkdirSync(path: string, options?: MkdirOptions): void;
-  export function mkdirSync(
-    path: string,
-    recursive?: boolean,
-    mode?: number,
-  ): void;
   export function mkdir(path: string, options?: MkdirOptions): Promise<void>;
-  export function mkdir(
-    path: string,
-    recursive?: boolean,
-    mode?: number,
-  ): Promise<void>;
   export interface MakeTempOptions {
     dir?: string;
     prefix?: string;
@@ -238,11 +228,13 @@ declare namespace Deno {
   export function readFileSync(path: string): Uint8Array;
   export function readFile(path: string): Promise<Uint8Array>;
   export interface FileInfo {
+    isFile: boolean;
+    isDirectory: boolean;
+    isSymlink: boolean;
     size: number;
     modified: number | null;
     accessed: number | null;
     created: number | null;
-    name: string | null;
     dev: number | null;
     ino: number | null;
     mode: number | null;
@@ -252,14 +244,14 @@ declare namespace Deno {
     rdev: number | null;
     blksize: number | null;
     blocks: number | null;
-    isFile(): boolean;
-    isDirectory(): boolean;
-    isSymlink(): boolean;
   }
   export function realpathSync(path: string): string;
   export function realpath(path: string): Promise<string>;
-  export function readdirSync(path: string): FileInfo[];
-  export function readdir(path: string): Promise<FileInfo[]>;
+  export interface DirEntry extends FileInfo {
+    name: string;
+  }
+  export function readdirSync(path: string): Iterable<DirEntry>;
+  export function readdir(path: string): AsyncIterable<DirEntry>;
   export function copyFileSync(fromPath: string, toPath: string): void;
   export function copyFile(fromPath: string, toPath: string): Promise<void>;
   export function readlinkSync(path: string): string;
@@ -296,9 +288,9 @@ declare namespace Deno {
     options?: WriteFileOptions,
   ): Promise<void>;
   interface Location {
-    filename: string;
-    line: number;
-    column: number;
+    fileName: string;
+    lineNumber: number;
+    columnNumber: number;
   }
   export function applySourceMap(location: Location): Location;
   export const errors: {
@@ -319,6 +311,7 @@ declare namespace Deno {
     UnexpectedEof: ErrorConstructor;
     BadResource: ErrorConstructor;
     Http: ErrorConstructor;
+    Busy: ErrorConstructor;
   };
   export type PermissionName =
     | "run"
@@ -405,13 +398,13 @@ declare namespace Deno {
     send(p: Uint8Array, addr: Addr): Promise<void>;
     close(): void;
     readonly addr: Addr;
-    [Symbol.asyncIterator](): AsyncIterator<[Uint8Array, Addr]>;
+    [Symbol.asyncIterator](): AsyncIterableIterator<[Uint8Array, Addr]>;
   }
   export interface Listener extends AsyncIterable<Conn> {
     accept(): Promise<Conn>;
     close(): void;
     readonly addr: Addr;
-    [Symbol.asyncIterator](): AsyncIterator<Conn>;
+    [Symbol.asyncIterator](): AsyncIterableIterator<Conn>;
   }
   export interface Conn extends Reader, Writer, Closer {
     readonly localAddr: Addr;
@@ -503,11 +496,17 @@ declare namespace Deno {
     close(): void;
     kill(signo: number): void;
   }
-  export interface ProcessStatus {
-    success: boolean;
-    code?: number;
-    signal?: number;
-  }
+  export type ProcessStatus =
+    | {
+      success: true;
+      code: 0;
+      signal?: undefined;
+    }
+    | {
+      success: false;
+      code: number;
+      signal?: number;
+    };
   export interface RunOptions {
     cmd: string[];
     cwd?: string;
@@ -688,8 +687,6 @@ declare namespace Deno {
     outDir?: string;
     paths?: Record<string, string[]>;
     preserveConstEnums?: boolean;
-    removeComments?: boolean;
-    resolveJsonModule?: boolean;
     rootDir?: string;
     rootDirs?: string[];
     sourceMap?: boolean;

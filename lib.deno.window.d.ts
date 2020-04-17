@@ -1,17 +1,18 @@
-declare interface Window extends WindowOrWorkerGlobalScope {
-  window: Window & WindowOrWorkerGlobalScope & typeof globalThis;
-  self: Window & WindowOrWorkerGlobalScope & typeof globalThis;
-  onload: Function | undefined;
-  onunload: Function | undefined;
+declare interface Window extends EventTarget {
+  readonly window: Window & typeof globalThis;
+  readonly self: Window & typeof globalThis;
+  onload: ((this: Window, ev: Event) => any) | null;
+  onunload: ((this: Window, ev: Event) => any) | null;
+  location: Location;
   crypto: Crypto;
   close: () => void;
-  closed: boolean;
+  readonly closed: boolean;
   Deno: typeof Deno;
 }
-declare const window: Window & WindowOrWorkerGlobalScope & typeof globalThis;
-declare const self: Window & WindowOrWorkerGlobalScope & typeof globalThis;
-declare const onload: Function | undefined;
-declare const onunload: Function | undefined;
+declare const window: Window & typeof globalThis;
+declare const self: Window & typeof globalThis;
+declare const onload: ((this: Window, ev: Event) => any) | null;
+declare const onunload: ((this: Window, ev: Event) => any) | null;
 declare const crypto: Crypto;
 declare interface Crypto {
   readonly subtle: null;
