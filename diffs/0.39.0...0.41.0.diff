@@ -1,0 +1,1733 @@
+diff --git a/lib.deno.ns.d.ts b/lib.deno.ns.d.ts
+index e4a1d6e..48b6c66 100644
+--- a/lib.deno.ns.d.ts
++++ b/lib.deno.ns.d.ts
+@@ -194,17 +194,7 @@ declare namespace Deno {
+     mode?: number;
+   }
+   export function mkdirSync(path: string, options?: MkdirOptions): void;
+-  export function mkdirSync(
+-    path: string,
+-    recursive?: boolean,
+-    mode?: number,
+-  ): void;
+   export function mkdir(path: string, options?: MkdirOptions): Promise<void>;
+-  export function mkdir(
+-    path: string,
+-    recursive?: boolean,
+-    mode?: number,
+-  ): Promise<void>;
+   export interface MakeTempOptions {
+     dir?: string;
+     prefix?: string;
+@@ -238,11 +228,13 @@ declare namespace Deno {
+   export function readFileSync(path: string): Uint8Array;
+   export function readFile(path: string): Promise<Uint8Array>;
+   export interface FileInfo {
++    isFile: boolean;
++    isDirectory: boolean;
++    isSymlink: boolean;
+     size: number;
+     modified: number | null;
+     accessed: number | null;
+     created: number | null;
+-    name: string | null;
+     dev: number | null;
+     ino: number | null;
+     mode: number | null;
+@@ -252,14 +244,14 @@ declare namespace Deno {
+     rdev: number | null;
+     blksize: number | null;
+     blocks: number | null;
+-    isFile(): boolean;
+-    isDirectory(): boolean;
+-    isSymlink(): boolean;
+   }
+   export function realpathSync(path: string): string;
+   export function realpath(path: string): Promise<string>;
+-  export function readdirSync(path: string): FileInfo[];
+-  export function readdir(path: string): Promise<FileInfo[]>;
++  export interface DirEntry extends FileInfo {
++    name: string;
++  }
++  export function readdirSync(path: string): Iterable<DirEntry>;
++  export function readdir(path: string): AsyncIterable<DirEntry>;
+   export function copyFileSync(fromPath: string, toPath: string): void;
+   export function copyFile(fromPath: string, toPath: string): Promise<void>;
+   export function readlinkSync(path: string): string;
+@@ -296,9 +288,9 @@ declare namespace Deno {
+     options?: WriteFileOptions,
+   ): Promise<void>;
+   interface Location {
+-    filename: string;
+-    line: number;
+-    column: number;
++    fileName: string;
++    lineNumber: number;
++    columnNumber: number;
+   }
+   export function applySourceMap(location: Location): Location;
+   export const errors: {
+@@ -319,6 +311,7 @@ declare namespace Deno {
+     UnexpectedEof: ErrorConstructor;
+     BadResource: ErrorConstructor;
+     Http: ErrorConstructor;
++    Busy: ErrorConstructor;
+   };
+   export type PermissionName =
+     | "run"
+@@ -405,13 +398,13 @@ declare namespace Deno {
+     send(p: Uint8Array, addr: Addr): Promise<void>;
+     close(): void;
+     readonly addr: Addr;
+-    [Symbol.asyncIterator](): AsyncIterator<[Uint8Array, Addr]>;
++    [Symbol.asyncIterator](): AsyncIterableIterator<[Uint8Array, Addr]>;
+   }
+   export interface Listener extends AsyncIterable<Conn> {
+     accept(): Promise<Conn>;
+     close(): void;
+     readonly addr: Addr;
+-    [Symbol.asyncIterator](): AsyncIterator<Conn>;
++    [Symbol.asyncIterator](): AsyncIterableIterator<Conn>;
+   }
+   export interface Conn extends Reader, Writer, Closer {
+     readonly localAddr: Addr;
+@@ -503,11 +496,17 @@ declare namespace Deno {
+     close(): void;
+     kill(signo: number): void;
+   }
+-  export interface ProcessStatus {
+-    success: boolean;
+-    code?: number;
+-    signal?: number;
+-  }
++  export type ProcessStatus =
++    | {
++      success: true;
++      code: 0;
++      signal?: undefined;
++    }
++    | {
++      success: false;
++      code: number;
++      signal?: number;
++    };
+   export interface RunOptions {
+     cmd: string[];
+     cwd?: string;
+@@ -688,8 +687,6 @@ declare namespace Deno {
+     outDir?: string;
+     paths?: Record<string, string[]>;
+     preserveConstEnums?: boolean;
+-    removeComments?: boolean;
+-    resolveJsonModule?: boolean;
+     rootDir?: string;
+     rootDirs?: string[];
+     sourceMap?: boolean;
+diff --git a/lib.deno.shared_globals.d.ts b/lib.deno.shared_globals.d.ts
+index 9c0b9b4..b7bfe23 100644
+--- a/lib.deno.shared_globals.d.ts
++++ b/lib.deno.shared_globals.d.ts
+@@ -1,52 +1,12 @@
+-declare interface WindowOrWorkerGlobalScope {
+-  atob: typeof __textEncoding.atob;
+-  btoa: typeof __textEncoding.btoa;
+-  clearInterval: typeof __timers.clearInterval;
+-  clearTimeout: typeof __timers.clearTimeout;
+-  fetch: typeof __fetch.fetch;
+-  setInterval: typeof __timers.setInterval;
+-  queueMicrotask: typeof __timers.queueMicrotask;
+-  setTimeout: typeof __timers.setTimeout;
+-  console: __console.Console;
+-  Blob: typeof __blob.DenoBlob;
+-  File: __domTypes.DomFileConstructor;
+-  CustomEvent: typeof __customEvent.CustomEvent;
+-  Event: typeof __event.Event;
+-  EventTarget: typeof __eventTarget.EventTarget;
+-  URL: typeof __url.URL;
+-  URLSearchParams: typeof __urlSearchParams.URLSearchParams;
+-  Headers: __domTypes.HeadersConstructor;
+-  FormData: __domTypes.FormDataConstructor;
+-  TextEncoder: typeof __textEncoding.TextEncoder;
+-  TextDecoder: typeof __textEncoding.TextDecoder;
+-  Request: __domTypes.RequestConstructor;
+-  Response: typeof __fetch.Response;
+-  performance: __performanceUtil.Performance;
+-  Worker: typeof __workers.WorkerImpl;
+-  location: __domTypes.Location;
+-  addEventListener: (
+-    type: string,
+-    callback: __domTypes.EventListenerOrEventListenerObject | null,
+-    options?: boolean | __domTypes.AddEventListenerOptions | undefined,
+-  ) => void;
+-  dispatchEvent: (event: __domTypes.Event) => boolean;
+-  removeEventListener: (
+-    type: string,
+-    callback: __domTypes.EventListenerOrEventListenerObject | null,
+-    options?: boolean | __domTypes.EventListenerOptions | undefined,
+-  ) => void;
+-}
+ declare namespace WebAssembly {
+   interface WebAssemblyInstantiatedSource {
+     module: Module;
+     instance: Instance;
+   }
+-  function compile(bufferSource: __domTypes.BufferSource): Promise<Module>;
+-  function compileStreaming(
+-    source: Promise<__domTypes.Response>,
+-  ): Promise<Module>;
++  function compile(bufferSource: BufferSource): Promise<Module>;
++  function compileStreaming(source: Promise<Response>): Promise<Module>;
+   function instantiate(
+-    bufferSource: __domTypes.BufferSource,
++    bufferSource: BufferSource,
+     importObject?: object,
+   ): Promise<WebAssemblyInstantiatedSource>;
+   function instantiate(
+@@ -54,10 +14,10 @@ declare namespace WebAssembly {
+     importObject?: object,
+   ): Promise<Instance>;
+   function instantiateStreaming(
+-    source: Promise<__domTypes.Response>,
++    source: Promise<Response>,
+     importObject?: object,
+   ): Promise<WebAssemblyInstantiatedSource>;
+-  function validate(bufferSource: __domTypes.BufferSource): boolean;
++  function validate(bufferSource: BufferSource): boolean;
+   type ImportExportKind = "function" | "table" | "memory" | "global";
+   interface ModuleExportDescriptor {
+     name: string;
+@@ -69,7 +29,7 @@ declare namespace WebAssembly {
+     kind: ImportExportKind;
+   }
+   class Module {
+-    constructor(bufferSource: __domTypes.BufferSource);
++    constructor(bufferSource: BufferSource);
+     static customSections(
+       moduleObject: Module,
+       sectionName: string,
+@@ -123,884 +83,598 @@ declare namespace WebAssembly {
+     constructor(message: string, fileName?: string, lineNumber?: string);
+   }
+ }
+-declare const atob: typeof __textEncoding.atob;
+-declare const btoa: typeof __textEncoding.btoa;
+-declare const clearInterval: typeof __timers.clearInterval;
+-declare const clearTimeout: typeof __timers.clearTimeout;
+-declare const fetch: typeof __fetch.fetch;
+-declare const setInterval: typeof __timers.setInterval;
+-declare const setTimeout: typeof __timers.setTimeout;
+-declare const queueMicrotask: typeof __timers.queueMicrotask;
+-declare const console: __console.Console;
+-declare const Blob: typeof __blob.DenoBlob;
+-declare const File: __domTypes.DomFileConstructor;
+-declare const CustomEventInit: typeof __customEvent.CustomEventInit;
+-declare const CustomEvent: typeof __customEvent.CustomEvent;
+-declare const EventInit: typeof __event.EventInit;
+-declare const Event: typeof __event.Event;
+-declare const EventListener: __domTypes.EventListener;
+-declare const EventTarget: typeof __eventTarget.EventTarget;
+-declare const URL: typeof __url.URL;
+-declare const URLSearchParams: typeof __urlSearchParams.URLSearchParams;
+-declare const Headers: __domTypes.HeadersConstructor;
+-declare const location: __domTypes.Location;
+-declare const FormData: __domTypes.FormDataConstructor;
+-declare const TextEncoder: typeof __textEncoding.TextEncoder;
+-declare const TextDecoder: typeof __textEncoding.TextDecoder;
+-declare const Request: __domTypes.RequestConstructor;
+-declare const Response: typeof __fetch.Response;
+-declare const performance: __performanceUtil.Performance;
+-declare const Worker: typeof __workers.WorkerImpl;
+-declare const addEventListener: (
++declare function setTimeout(
++  cb: (...args: unknown[]) => void,
++  delay?: number,
++  ...args: unknown[]
++): number;
++declare function setInterval(
++  cb: (...args: unknown[]) => void,
++  delay?: number,
++  ...args: unknown[]
++): number;
++declare function clearTimeout(id?: number): void;
++declare function clearInterval(id?: number): void;
++declare function queueMicrotask(func: Function): void;
++declare var console: Console;
++declare var location: Location;
++declare function addEventListener(
+   type: string,
+-  callback: __domTypes.EventListenerOrEventListenerObject | null,
+-  options?: boolean | __domTypes.AddEventListenerOptions | undefined,
+-) => void;
+-declare const dispatchEvent: (event: __domTypes.Event) => boolean;
+-declare const removeEventListener: (
++  callback: EventListenerOrEventListenerObject | null,
++  options?: boolean | AddEventListenerOptions | undefined,
++): void;
++declare function dispatchEvent(event: Event): boolean;
++declare function removeEventListener(
+   type: string,
+-  callback: __domTypes.EventListenerOrEventListenerObject | null,
+-  options?: boolean | __domTypes.EventListenerOptions | undefined,
+-) => void;
+-declare type Blob = __domTypes.Blob;
+-declare type Body = __domTypes.Body;
+-declare type File = __domTypes.DomFile;
+-declare type CustomEventInit = __domTypes.CustomEventInit;
+-declare type CustomEvent = __domTypes.CustomEvent;
+-declare type EventInit = __domTypes.EventInit;
+-declare type Event = __domTypes.Event;
+-declare type EventListener = __domTypes.EventListener;
+-declare type EventTarget = __domTypes.EventTarget;
+-declare type URL = __url.URL;
+-declare type URLSearchParams = __domTypes.URLSearchParams;
+-declare type Headers = __domTypes.Headers;
+-declare type FormData = __domTypes.FormData;
+-declare type TextEncoder = __textEncoding.TextEncoder;
+-declare type TextDecoder = __textEncoding.TextDecoder;
+-declare type Request = __domTypes.Request;
+-declare type Response = __domTypes.Response;
+-declare type Worker = __workers.Worker;
++  callback: EventListenerOrEventListenerObject | null,
++  options?: boolean | EventListenerOptions | undefined,
++): void;
+ declare interface ImportMeta {
+   url: string;
+   main: boolean;
+ }
+-declare namespace __domTypes {
+-  export type BufferSource = ArrayBufferView | ArrayBuffer;
+-  export type HeadersInit =
+-    | Headers
+-    | Array<[string, string]>
+-    | Record<string, string>;
+-  export type URLSearchParamsInit =
+-    | string
+-    | string[][]
+-    | Record<string, string>;
+-  type BodyInit =
+-    | Blob
+-    | BufferSource
+-    | FormData
+-    | URLSearchParams
+-    | ReadableStream
+-    | string;
+-  export type RequestInfo = Request | string;
+-  type ReferrerPolicy =
+-    | ""
+-    | "no-referrer"
+-    | "no-referrer-when-downgrade"
+-    | "origin-only"
+-    | "origin-when-cross-origin"
+-    | "unsafe-url";
+-  export type BlobPart = BufferSource | Blob | string;
+-  export type FormDataEntryValue = DomFile | string;
+-  export interface DomIterable<K, V> {
+-    keys(): IterableIterator<K>;
+-    values(): IterableIterator<V>;
+-    entries(): IterableIterator<[K, V]>;
+-    [Symbol.iterator](): IterableIterator<[K, V]>;
+-    forEach(
+-      callback: (value: V, key: K, parent: this) => void,
+-      thisArg?: any,
+-    ): void;
+-  }
+-  type EndingType = "transparent" | "native";
+-  export interface BlobPropertyBag {
+-    type?: string;
+-    ending?: EndingType;
+-  }
+-  interface AbortSignalEventMap {
+-    abort: ProgressEvent;
+-  }
+-  export enum NodeType {
+-    ELEMENT_NODE = 1,
+-    TEXT_NODE = 3,
+-    DOCUMENT_FRAGMENT_NODE = 11,
+-  }
+-  export interface EventListener {
+-    (evt: Event): void | Promise<void>;
+-  }
+-  export interface EventListenerObject {
+-    handleEvent(evt: Event): void | Promise<void>;
+-  }
+-  export type EventListenerOrEventListenerObject =
+-    | EventListener
+-    | EventListenerObject;
+-  export interface EventTargetListener {
+-    callback: EventListenerOrEventListenerObject;
+-    options: AddEventListenerOptions;
+-  }
+-  export const eventTargetHost: unique symbol;
+-  export const eventTargetListeners: unique symbol;
+-  export const eventTargetMode: unique symbol;
+-  export const eventTargetNodeType: unique symbol;
+-  export interface EventTarget {
+-    addEventListener(
+-      type: string,
+-      callback: EventListenerOrEventListenerObject | null,
+-      options?: boolean | AddEventListenerOptions,
+-    ): void;
+-    dispatchEvent(event: Event): boolean;
+-    removeEventListener(
+-      type: string,
+-      callback?: EventListenerOrEventListenerObject | null,
+-      options?: EventListenerOptions | boolean,
+-    ): void;
+-  }
+-  export interface ProgressEventInit extends EventInit {
+-    lengthComputable?: boolean;
+-    loaded?: number;
+-    total?: number;
+-  }
+-  export interface URLSearchParams extends DomIterable<string, string> {
+-    append(name: string, value: string): void;
+-    delete(name: string): void;
+-    get(name: string): string | null;
+-    getAll(name: string): string[];
+-    has(name: string): boolean;
+-    set(name: string, value: string): void;
+-    sort(): void;
+-    toString(): string;
+-    forEach(
+-      callbackfn: (value: string, key: string, parent: this) => void,
+-      thisArg?: any,
+-    ): void;
+-  }
+-  export interface EventInit {
+-    bubbles?: boolean;
+-    cancelable?: boolean;
+-    composed?: boolean;
+-  }
+-  export interface CustomEventInit extends EventInit {
+-    detail?: any;
+-  }
+-  export enum EventPhase {
+-    NONE = 0,
+-    CAPTURING_PHASE = 1,
+-    AT_TARGET = 2,
+-    BUBBLING_PHASE = 3,
+-  }
+-  export interface EventPath {
+-    item: EventTarget;
+-    itemInShadowTree: boolean;
+-    relatedTarget: EventTarget | null;
+-    rootOfClosedTree: boolean;
+-    slotInClosedTree: boolean;
+-    target: EventTarget | null;
+-    touchTargetList: EventTarget[];
+-  }
+-  export interface Event {
+-    readonly type: string;
+-    target: EventTarget | null;
+-    currentTarget: EventTarget | null;
+-    composedPath(): EventPath[];
+-    eventPhase: number;
+-    stopPropagation(): void;
+-    stopImmediatePropagation(): void;
+-    readonly bubbles: boolean;
+-    readonly cancelable: boolean;
+-    preventDefault(): void;
+-    readonly defaultPrevented: boolean;
+-    readonly composed: boolean;
+-    isTrusted: boolean;
+-    readonly timeStamp: Date;
+-    dispatched: boolean;
+-    readonly initialized: boolean;
+-    inPassiveListener: boolean;
+-    cancelBubble: boolean;
+-    cancelBubbleImmediately: boolean;
+-    path: EventPath[];
+-    relatedTarget: EventTarget | null;
+-  }
+-  export interface CustomEvent extends Event {
+-    readonly detail: any;
+-    initCustomEvent(
+-      type: string,
+-      bubbles?: boolean,
+-      cancelable?: boolean,
+-      detail?: any | null,
+-    ): void;
+-  }
+-  export interface DomFile extends Blob {
+-    readonly lastModified: number;
+-    readonly name: string;
+-  }
+-  export interface DomFileConstructor {
+-    new (
+-      bits: BlobPart[],
+-      filename: string,
+-      options?: FilePropertyBag,
+-    ): DomFile;
+-    prototype: DomFile;
+-  }
+-  export interface FilePropertyBag extends BlobPropertyBag {
+-    lastModified?: number;
+-  }
+-  interface ProgressEvent extends Event {
+-    readonly lengthComputable: boolean;
+-    readonly loaded: number;
+-    readonly total: number;
+-  }
+-  export interface EventListenerOptions {
+-    capture?: boolean;
+-  }
+-  export interface AddEventListenerOptions extends EventListenerOptions {
+-    once?: boolean;
+-    passive?: boolean;
+-  }
+-  interface AbortSignal extends EventTarget {
+-    readonly aborted: boolean;
+-    onabort: ((this: AbortSignal, ev: ProgressEvent) => any) | null;
+-    addEventListener<K extends keyof AbortSignalEventMap>(
+-      type: K,
+-      listener: (this: AbortSignal, ev: AbortSignalEventMap[K]) => any,
+-      options?: boolean | AddEventListenerOptions,
+-    ): void;
+-    addEventListener(
+-      type: string,
+-      listener: EventListener,
+-      options?: boolean | AddEventListenerOptions,
+-    ): void;
+-    removeEventListener<K extends keyof AbortSignalEventMap>(
+-      type: K,
+-      listener: (this: AbortSignal, ev: AbortSignalEventMap[K]) => any,
+-      options?: boolean | EventListenerOptions,
+-    ): void;
+-    removeEventListener(
+-      type: string,
+-      listener: EventListener,
+-      options?: boolean | EventListenerOptions,
+-    ): void;
+-  }
+-  export interface ReadableStreamReadDoneResult<T> {
+-    done: true;
+-    value?: T;
+-  }
+-  export interface ReadableStreamReadValueResult<T> {
+-    done: false;
+-    value: T;
+-  }
+-  export type ReadableStreamReadResult<T> =
+-    | ReadableStreamReadValueResult<T>
+-    | ReadableStreamReadDoneResult<T>;
+-  export interface ReadableStreamDefaultReader<R = any> {
+-    readonly closed: Promise<void>;
+-    cancel(reason?: any): Promise<void>;
+-    read(): Promise<ReadableStreamReadResult<R>>;
+-    releaseLock(): void;
+-  }
+-  export interface PipeOptions {
+-    preventAbort?: boolean;
+-    preventCancel?: boolean;
+-    preventClose?: boolean;
+-    signal?: AbortSignal;
+-  }
+-  export interface ReadableStream<R = any> {
+-    readonly locked: boolean;
+-    cancel(reason?: any): Promise<void>;
+-    getReader(options: { mode: "byob" }): ReadableStreamBYOBReader;
+-    getReader(): ReadableStreamDefaultReader<R>;
+-    tee(): [ReadableStream<R>, ReadableStream<R>];
+-  }
+-  export interface ReadableStreamReader<R = any> {
+-    cancel(reason: any): Promise<void>;
+-    read(): Promise<ReadableStreamReadResult<R>>;
+-    releaseLock(): void;
+-  }
+-  export interface ReadableStreamBYOBReader {
+-    readonly closed: Promise<void>;
+-    cancel(reason?: any): Promise<void>;
+-    read<T extends ArrayBufferView>(
+-      view: T,
+-    ): Promise<ReadableStreamReadResult<T>>;
+-    releaseLock(): void;
+-  }
+-  export interface WritableStream<W = any> {
+-    readonly locked: boolean;
+-    abort(reason?: any): Promise<void>;
+-    getWriter(): WritableStreamDefaultWriter<W>;
+-  }
+-  export interface WritableStreamDefaultWriter<W = any> {
+-    readonly closed: Promise<void>;
+-    readonly desiredSize: number | null;
+-    readonly ready: Promise<void>;
+-    abort(reason?: any): Promise<void>;
+-    close(): Promise<void>;
+-    releaseLock(): void;
+-    write(chunk: W): Promise<void>;
+-  }
+-  export interface FormData extends DomIterable<string, FormDataEntryValue> {
+-    append(name: string, value: string | Blob, fileName?: string): void;
+-    delete(name: string): void;
+-    get(name: string): FormDataEntryValue | null;
+-    getAll(name: string): FormDataEntryValue[];
+-    has(name: string): boolean;
+-    set(name: string, value: string | Blob, fileName?: string): void;
+-  }
+-  export interface FormDataConstructor {
+-    new (): FormData;
+-    prototype: FormData;
+-  }
+-  export interface Blob {
+-    readonly size: number;
+-    readonly type: string;
+-    slice(start?: number, end?: number, contentType?: string): Blob;
+-  }
+-  export interface Body {
+-    readonly body: ReadableStream<Uint8Array> | null;
+-    readonly bodyUsed: boolean;
+-    arrayBuffer(): Promise<ArrayBuffer>;
+-    blob(): Promise<Blob>;
+-    formData(): Promise<FormData>;
+-    json(): Promise<any>;
+-    text(): Promise<string>;
+-  }
+-  export interface Headers extends DomIterable<string, string> {
+-    append(name: string, value: string): void;
+-    delete(name: string): void;
+-    entries(): IterableIterator<[string, string]>;
+-    get(name: string): string | null;
+-    has(name: string): boolean;
+-    keys(): IterableIterator<string>;
+-    set(name: string, value: string): void;
+-    values(): IterableIterator<string>;
+-    forEach(
+-      callbackfn: (value: string, key: string, parent: this) => void,
+-      thisArg?: any,
+-    ): void;
+-    [Symbol.iterator](): IterableIterator<[string, string]>;
+-  }
+-  export interface HeadersConstructor {
+-    new (init?: HeadersInit): Headers;
+-    prototype: Headers;
+-  }
+-  type RequestCache =
+-    | "default"
+-    | "no-store"
+-    | "reload"
+-    | "no-cache"
+-    | "force-cache"
+-    | "only-if-cached";
+-  type RequestCredentials = "omit" | "same-origin" | "include";
+-  type RequestDestination =
+-    | ""
+-    | "audio"
+-    | "audioworklet"
+-    | "document"
+-    | "embed"
+-    | "font"
+-    | "image"
+-    | "manifest"
+-    | "object"
+-    | "paintworklet"
+-    | "report"
+-    | "script"
+-    | "sharedworker"
+-    | "style"
+-    | "track"
+-    | "video"
+-    | "worker"
+-    | "xslt";
+-  type RequestMode = "navigate" | "same-origin" | "no-cors" | "cors";
+-  type RequestRedirect = "follow" | "error" | "manual";
+-  type ResponseType =
+-    | "basic"
+-    | "cors"
+-    | "default"
+-    | "error"
+-    | "opaque"
+-    | "opaqueredirect";
+-  export interface RequestInit {
+-    body?: BodyInit | null;
+-    cache?: RequestCache;
+-    credentials?: RequestCredentials;
+-    headers?: HeadersInit;
+-    integrity?: string;
+-    keepalive?: boolean;
+-    method?: string;
+-    mode?: RequestMode;
+-    redirect?: RequestRedirect;
+-    referrer?: string;
+-    referrerPolicy?: ReferrerPolicy;
+-    signal?: AbortSignal | null;
+-    window?: any;
+-  }
+-  export interface ResponseInit {
+-    headers?: HeadersInit;
+-    status?: number;
+-    statusText?: string;
+-  }
+-  export interface RequestConstructor {
+-    new (input: RequestInfo, init?: RequestInit): Request;
+-    prototype: Request;
+-  }
+-  export interface Request extends Body {
+-    readonly cache?: RequestCache;
+-    readonly credentials?: RequestCredentials;
+-    readonly destination?: RequestDestination;
+-    readonly headers: Headers;
+-    readonly integrity?: string;
+-    readonly isHistoryNavigation?: boolean;
+-    readonly isReloadNavigation?: boolean;
+-    readonly keepalive?: boolean;
+-    readonly method: string;
+-    readonly mode?: RequestMode;
+-    readonly redirect?: RequestRedirect;
+-    readonly referrer?: string;
+-    readonly referrerPolicy?: ReferrerPolicy;
+-    readonly signal?: AbortSignal;
+-    readonly url: string;
+-    clone(): Request;
+-  }
+-  export interface Response extends Body {
+-    readonly headers: Headers;
+-    readonly ok: boolean;
+-    readonly redirected: boolean;
+-    readonly status: number;
+-    readonly statusText: string;
+-    readonly trailer: Promise<Headers>;
+-    readonly type: ResponseType;
+-    readonly url: string;
+-    clone(): Response;
+-  }
+-  export interface DOMStringList {
+-    readonly length: number;
+-    contains(string: string): boolean;
+-    item(index: number): string | null;
+-    [index: number]: string;
+-  }
+-  export interface Location {
+-    readonly ancestorOrigins: DOMStringList;
+-    hash: string;
+-    host: string;
+-    hostname: string;
+-    href: string;
+-    toString(): string;
+-    readonly origin: string;
+-    pathname: string;
+-    port: string;
+-    protocol: string;
+-    search: string;
+-    assign(url: string): void;
+-    reload(): void;
+-    replace(url: string): void;
+-  }
++interface DomIterable<K, V> {
++  keys(): IterableIterator<K>;
++  values(): IterableIterator<V>;
++  entries(): IterableIterator<[K, V]>;
++  [Symbol.iterator](): IterableIterator<[K, V]>;
++  forEach(
++    callback: (value: V, key: K, parent: this) => void,
++    thisArg?: any,
++  ): void;
+ }
+-declare namespace __blob {
+-  export class DenoBlob implements __domTypes.Blob {
+-    readonly size: number;
+-    readonly type: string;
+-    constructor(
+-      blobParts?: __domTypes.BlobPart[],
+-      options?: __domTypes.BlobPropertyBag,
+-    );
+-    slice(start?: number, end?: number, contentType?: string): DenoBlob;
+-  }
++interface ReadableStreamReadDoneResult<T> {
++  done: true;
++  value?: T;
+ }
+-declare namespace __console {
+-  type InspectOptions = Partial<{
+-    showHidden: boolean;
+-    depth: number;
+-    colors: boolean;
+-    indentLevel: number;
+-  }>;
+-  export class CSI {
+-    static kClear: string;
+-    static kClearScreenDown: string;
+-  }
+-  const isConsoleInstance: unique symbol;
+-  export class Console {
+-    indentLevel: number;
+-    [isConsoleInstance]: boolean;
+-    log: (...args: unknown[]) => void;
+-    debug: (...args: unknown[]) => void;
+-    info: (...args: unknown[]) => void;
+-    dir: (
+-      obj: unknown,
+-      options?: Partial<{
+-        showHidden: boolean;
+-        depth: number;
+-        colors: boolean;
+-        indentLevel: number;
+-      }>,
+-    ) => void;
+-    dirxml: (
+-      obj: unknown,
+-      options?: Partial<{
+-        showHidden: boolean;
+-        depth: number;
+-        colors: boolean;
+-        indentLevel: number;
+-      }>,
+-    ) => void;
+-    warn: (...args: unknown[]) => void;
+-    error: (...args: unknown[]) => void;
+-    assert: (condition?: boolean, ...args: unknown[]) => void;
+-    count: (label?: string) => void;
+-    countReset: (label?: string) => void;
+-    table: (data: unknown, properties?: string[] | undefined) => void;
+-    time: (label?: string) => void;
+-    timeLog: (label?: string, ...args: unknown[]) => void;
+-    timeEnd: (label?: string) => void;
+-    group: (...label: unknown[]) => void;
+-    groupCollapsed: (...label: unknown[]) => void;
+-    groupEnd: () => void;
+-    clear: () => void;
+-    trace: (...args: unknown[]) => void;
+-    static [Symbol.hasInstance](instance: Console): boolean;
+-  }
+-  export const customInspect: unique symbol;
+-  export function inspect(value: unknown, options?: InspectOptions): string;
+-}
+-declare namespace __event {
+-  export const eventAttributes: WeakMap<object, any>;
+-  export class EventInit implements __domTypes.EventInit {
+-    bubbles: boolean;
+-    cancelable: boolean;
+-    composed: boolean;
+-    constructor({
+-      bubbles,
+-      cancelable,
+-      composed,
+-    }?: {
+-      bubbles?: boolean | undefined;
+-      cancelable?: boolean | undefined;
+-      composed?: boolean | undefined;
+-    });
+-  }
+-  export class Event implements __domTypes.Event {
+-    isTrusted: boolean;
+-    private _canceledFlag;
+-    private _dispatchedFlag;
+-    private _initializedFlag;
+-    private _inPassiveListenerFlag;
+-    private _stopImmediatePropagationFlag;
+-    private _stopPropagationFlag;
+-    private _path;
+-    constructor(type: string, eventInitDict?: __domTypes.EventInit);
+-    readonly bubbles: boolean;
+-    cancelBubble: boolean;
+-    cancelBubbleImmediately: boolean;
+-    readonly cancelable: boolean;
+-    readonly composed: boolean;
+-    currentTarget: __domTypes.EventTarget;
+-    readonly defaultPrevented: boolean;
+-    dispatched: boolean;
+-    eventPhase: number;
+-    readonly initialized: boolean;
+-    inPassiveListener: boolean;
+-    path: __domTypes.EventPath[];
+-    relatedTarget: __domTypes.EventTarget;
+-    target: __domTypes.EventTarget;
+-    readonly timeStamp: Date;
+-    readonly type: string;
+-    composedPath(): __domTypes.EventPath[];
+-    preventDefault(): void;
+-    stopPropagation(): void;
+-    stopImmediatePropagation(): void;
+-  }
++interface ReadableStreamReadValueResult<T> {
++  done: false;
++  value: T;
+ }
+-declare namespace __customEvent {
+-  export const customEventAttributes: WeakMap<object, any>;
+-  export class CustomEventInit extends __event.EventInit
+-    implements __domTypes.CustomEventInit {
+-    detail: any;
+-    constructor({
+-      bubbles,
+-      cancelable,
+-      composed,
+-      detail,
+-    }: __domTypes.CustomEventInit);
+-  }
+-  export class CustomEvent extends __event.Event
+-    implements __domTypes.CustomEvent {
+-    constructor(type: string, customEventInitDict?: __domTypes.CustomEventInit);
+-    readonly detail: any;
+-    initCustomEvent(
+-      type: string,
+-      bubbles?: boolean,
+-      cancelable?: boolean,
+-      detail?: any,
+-    ): void;
+-    readonly [Symbol.toStringTag]: string;
+-  }
++type ReadableStreamReadResult<T> =
++  | ReadableStreamReadValueResult<T>
++  | ReadableStreamReadDoneResult<T>;
++interface ReadableStreamDefaultReader<R = any> {
++  readonly closed: Promise<void>;
++  cancel(reason?: any): Promise<void>;
++  read(): Promise<ReadableStreamReadResult<R>>;
++  releaseLock(): void;
+ }
+-declare namespace __eventTarget {
+-  export class EventListenerOptions implements __domTypes.EventListenerOptions {
+-    _capture: boolean;
+-    constructor({ capture }?: { capture?: boolean | undefined });
+-    readonly capture: boolean;
+-  }
+-  export class AddEventListenerOptions extends EventListenerOptions
+-    implements __domTypes.AddEventListenerOptions {
+-    _passive: boolean;
+-    _once: boolean;
+-    constructor({
+-      capture,
+-      passive,
+-      once,
+-    }?: {
+-      capture?: boolean | undefined;
+-      passive?: boolean | undefined;
+-      once?: boolean | undefined;
+-    });
+-    readonly passive: boolean;
+-    readonly once: boolean;
+-  }
+-  export const eventTargetAssignedSlot: unique symbol;
+-  export const eventTargetHasActivationBehavior: unique symbol;
+-  export class EventTarget implements __domTypes.EventTarget {
+-    [__domTypes.eventTargetHost]: __domTypes.EventTarget | null;
+-    [__domTypes.eventTargetListeners]: {
+-      [type in string]: __domTypes.EventListener[];
+-    };
+-    [__domTypes.eventTargetMode]: string;
+-    [__domTypes.eventTargetNodeType]: __domTypes.NodeType;
+-    private [eventTargetAssignedSlot];
+-    private [eventTargetHasActivationBehavior];
+-    addEventListener(
+-      type: string,
+-      callback: __domTypes.EventListenerOrEventListenerObject | null,
+-      options?: __domTypes.AddEventListenerOptions | boolean,
+-    ): void;
+-    removeEventListener(
+-      type: string,
+-      callback: __domTypes.EventListenerOrEventListenerObject | null,
+-      options?: __domTypes.EventListenerOptions | boolean,
+-    ): void;
+-    dispatchEvent(event: __domTypes.Event): boolean;
+-    readonly [Symbol.toStringTag]: string;
+-  }
++interface UnderlyingSource<R = any> {
++  cancel?: ReadableStreamErrorCallback;
++  pull?: ReadableStreamDefaultControllerCallback<R>;
++  start?: ReadableStreamDefaultControllerCallback<R>;
++  type?: undefined;
+ }
+-declare namespace __io {
+-  export enum SeekMode {
+-    SEEK_START = 0,
+-    SEEK_CURRENT = 1,
+-    SEEK_END = 2,
+-  }
+-  export interface Reader {
+-    read(p: Uint8Array): Promise<number | Deno.EOF>;
+-  }
+-  export interface SyncReader {
+-    readSync(p: Uint8Array): number | Deno.EOF;
+-  }
+-  export interface Writer {
+-    write(p: Uint8Array): Promise<number>;
+-  }
+-  export interface SyncWriter {
+-    writeSync(p: Uint8Array): number;
+-  }
+-  export interface Closer {
+-    close(): void;
+-  }
+-  export interface Seeker {
+-    seek(offset: number, whence: SeekMode): Promise<number>;
+-  }
+-  export interface SyncSeeker {
+-    seekSync(offset: number, whence: SeekMode): number;
+-  }
+-  export interface ReadCloser extends Reader, Closer {}
+-  export interface WriteCloser extends Writer, Closer {}
+-  export interface ReadSeeker extends Reader, Seeker {}
+-  export interface WriteSeeker extends Writer, Seeker {}
+-  export interface ReadWriteCloser extends Reader, Writer, Closer {}
+-  export interface ReadWriteSeeker extends Reader, Writer, Seeker {}
+-  export function copy(dst: Writer, src: Reader): Promise<number>;
+-  export function toAsyncIterator(r: Reader): AsyncIterableIterator<Uint8Array>;
+-}
+-declare namespace __fetch {
+-  class Body
+-    implements
+-      __domTypes.Body,
+-      __domTypes.ReadableStream<Uint8Array>,
+-      __io.ReadCloser
+-  {
+-    readonly contentType: string;
+-    bodyUsed: boolean;
+-    readonly locked: boolean;
+-    readonly body: __domTypes.ReadableStream<Uint8Array>;
+-    constructor(rid: number, contentType: string);
+-    arrayBuffer(): Promise<ArrayBuffer>;
+-    blob(): Promise<__domTypes.Blob>;
+-    formData(): Promise<__domTypes.FormData>;
+-    json(): Promise<any>;
+-    text(): Promise<string>;
+-    read(p: Uint8Array): Promise<number | Deno.EOF>;
+-    close(): void;
+-    cancel(): Promise<void>;
+-    getReader(options: { mode: "byob" }): __domTypes.ReadableStreamBYOBReader;
+-    getReader(): __domTypes.ReadableStreamDefaultReader<Uint8Array>;
+-    getReader(): __domTypes.ReadableStreamBYOBReader;
+-    tee(): [__domTypes.ReadableStream, __domTypes.ReadableStream];
+-    [Symbol.asyncIterator](): AsyncIterableIterator<Uint8Array>;
+-  }
+-  export class Response implements __domTypes.Response {
+-    readonly url: string;
+-    readonly status: number;
+-    statusText: string;
+-    readonly type: __domTypes.ResponseType;
+-    readonly redirected: boolean;
+-    headers: __domTypes.Headers;
+-    readonly trailer: Promise<__domTypes.Headers>;
+-    bodyUsed: boolean;
+-    readonly body: Body;
+-    constructor(
+-      url: string,
+-      status: number,
+-      statusText: string,
+-      headersList: Array<[string, string]>,
+-      rid: number,
+-      redirected_: boolean,
+-      type_?: null | __domTypes.ResponseType,
+-      body_?: null | Body,
+-    );
+-    arrayBuffer(): Promise<ArrayBuffer>;
+-    blob(): Promise<__domTypes.Blob>;
+-    formData(): Promise<__domTypes.FormData>;
+-    json(): Promise<any>;
+-    text(): Promise<string>;
+-    readonly ok: boolean;
+-    clone(): __domTypes.Response;
+-    redirect(url: URL | string, status: number): __domTypes.Response;
+-  }
+-  export function fetch(
+-    input: __domTypes.Request | __url.URL | string,
+-    init?: __domTypes.RequestInit,
+-  ): Promise<Response>;
+-}
+-declare namespace __textEncoding {
+-  export function atob(s: string): string;
+-  export function btoa(s: string): string;
+-  export interface TextDecodeOptions {
+-    stream?: false;
+-  }
+-  export interface TextDecoderOptions {
+-    fatal?: boolean;
+-    ignoreBOM?: boolean;
+-  }
+-  export class TextDecoder {
+-    readonly encoding: string;
+-    readonly fatal: boolean;
+-    readonly ignoreBOM = false;
+-    constructor(label?: string, options?: TextDecoderOptions);
+-    decode(
+-      input?: __domTypes.BufferSource,
+-      options?: TextDecodeOptions,
+-    ): string;
+-    readonly [Symbol.toStringTag]: string;
+-  }
+-  interface TextEncoderEncodeIntoResult {
+-    read: number;
+-    written: number;
+-  }
+-  export class TextEncoder {
+-    readonly encoding = "utf-8";
+-    encode(input?: string): Uint8Array;
+-    encodeInto(input: string, dest: Uint8Array): TextEncoderEncodeIntoResult;
+-    readonly [Symbol.toStringTag]: string;
+-  }
++interface ReadableStreamErrorCallback {
++  (reason: any): void | PromiseLike<void>;
+ }
+-declare namespace __timers {
+-  export type Args = unknown[];
+-  export function setTimeout(
+-    cb: (...args: Args) => void,
+-    delay?: number,
+-    ...args: Args
+-  ): number;
+-  export function setInterval(
+-    cb: (...args: Args) => void,
+-    delay?: number,
+-    ...args: Args
+-  ): number;
+-  export function clearTimeout(id?: number): void;
+-  export function clearInterval(id?: number): void;
+-  export function queueMicrotask(func: Function): void;
+-}
+-declare namespace __urlSearchParams {
+-  export class URLSearchParams {
+-    constructor(init?: string | string[][] | Record<string, string>);
+-    append(name: string, value: string): void;
+-    delete(name: string): void;
+-    getAll(name: string): string[];
+-    get(name: string): string | null;
+-    has(name: string): boolean;
+-    set(name: string, value: string): void;
+-    sort(): void;
+-    forEach(
+-      callbackfn: (value: string, key: string, parent: this) => void,
+-      thisArg?: any,
+-    ): void;
+-    keys(): IterableIterator<string>;
+-    values(): IterableIterator<string>;
+-    entries(): IterableIterator<[string, string]>;
+-    [Symbol.iterator](): IterableIterator<[string, string]>;
+-    toString(): string;
+-  }
++interface ReadableStreamDefaultControllerCallback<R> {
++  (controller: ReadableStreamDefaultController<R>): void | PromiseLike<void>;
+ }
+-declare namespace __url {
+-  export interface URL {
+-    hash: string;
+-    host: string;
+-    hostname: string;
+-    href: string;
+-    readonly origin: string;
+-    password: string;
+-    pathname: string;
+-    port: string;
+-    protocol: string;
+-    search: string;
+-    readonly searchParams: __urlSearchParams.URLSearchParams;
+-    username: string;
+-    toString(): string;
+-    toJSON(): string;
+-  }
+-  export const URL: {
+-    prototype: URL;
+-    new (url: string, base?: string | URL): URL;
+-    createObjectURL(object: __domTypes.Blob): string;
+-    revokeObjectURL(url: string): void;
+-  };
+-}
+-declare namespace __workers {
+-  export interface Worker {
+-    onerror?: (e: Event) => void;
+-    onmessage?: (e: { data: any }) => void;
+-    onmessageerror?: () => void;
+-    postMessage(data: any): void;
+-    terminate(): void;
+-  }
+-  export interface WorkerOptions {
+-    type?: "classic" | "module";
+-    name?: string;
+-  }
+-  export class WorkerImpl implements Worker {
+-    onerror?: (e: Event) => void;
+-    onmessage?: (data: any) => void;
+-    onmessageerror?: () => void;
+-    constructor(specifier: string, options?: WorkerOptions);
+-    postMessage(data: any): void;
+-    terminate(): void;
+-  }
++interface ReadableStreamDefaultController<R> {
++  readonly desiredSize: number;
++  enqueue(chunk?: R): void;
++  close(): void;
++  error(e?: any): void;
+ }
+-declare namespace __performanceUtil {
+-  export class Performance {
+-    now(): number;
+-  }
++interface ReadableStream<R = any> {
++  readonly locked: boolean;
++  cancel(reason?: any): Promise<void>;
++  getReader(): ReadableStreamDefaultReader<R>;
++  tee(): [ReadableStream<R>, ReadableStream<R>];
++}
++declare const ReadableStream: {
++  prototype: ReadableStream;
++  new <R = any>(src?: UnderlyingSource<R>): ReadableStream<R>;
++};
++interface WritableStream<W = any> {
++  readonly locked: boolean;
++  abort(reason?: any): Promise<void>;
++  getWriter(): WritableStreamDefaultWriter<W>;
++}
++interface WritableStreamDefaultWriter<W = any> {
++  readonly closed: Promise<void>;
++  readonly desiredSize: number | null;
++  readonly ready: Promise<void>;
++  abort(reason?: any): Promise<void>;
++  close(): Promise<void>;
++  releaseLock(): void;
++  write(chunk: W): Promise<void>;
++}
++interface DOMStringList {
++  readonly length: number;
++  contains(string: string): boolean;
++  item(index: number): string | null;
++  [index: number]: string;
++}
++declare class DOMException extends Error {
++  constructor(message?: string, name?: string);
++  readonly name: string;
++  readonly message: string;
++}
++declare interface Location {
++  readonly ancestorOrigins: DOMStringList;
++  hash: string;
++  host: string;
++  hostname: string;
++  href: string;
++  toString(): string;
++  readonly origin: string;
++  pathname: string;
++  port: string;
++  protocol: string;
++  search: string;
++  assign(url: string): void;
++  reload(): void;
++  replace(url: string): void;
++}
++type BufferSource = ArrayBufferView | ArrayBuffer;
++type BlobPart = BufferSource | Blob | string;
++interface BlobPropertyBag {
++  type?: string;
++  ending?: "transparent" | "native";
++}
++interface Blob {
++  readonly size: number;
++  readonly type: string;
++  arrayBuffer(): Promise<ArrayBuffer>;
++  slice(start?: number, end?: number, contentType?: string): Blob;
++  stream(): ReadableStream;
++  text(): Promise<string>;
++}
++declare const Blob: {
++  prototype: Blob;
++  new (blobParts?: BlobPart[], options?: BlobPropertyBag): Blob;
++};
++interface FilePropertyBag extends BlobPropertyBag {
++  lastModified?: number;
++}
++interface File extends Blob {
++  readonly lastModified: number;
++  readonly name: string;
++}
++declare const File: {
++  prototype: File;
++  new (fileBits: BlobPart[], fileName: string, options?: FilePropertyBag): File;
++};
++declare const isConsoleInstance: unique symbol;
++declare class Console {
++  indentLevel: number;
++  [isConsoleInstance]: boolean;
++  log: (...args: unknown[]) => void;
++  debug: (...args: unknown[]) => void;
++  info: (...args: unknown[]) => void;
++  dir: (
++    obj: unknown,
++    options?: Partial<{
++      showHidden: boolean;
++      depth: number;
++      colors: boolean;
++      indentLevel: number;
++    }>,
++  ) => void;
++  dirxml: (
++    obj: unknown,
++    options?: Partial<{
++      showHidden: boolean;
++      depth: number;
++      colors: boolean;
++      indentLevel: number;
++    }>,
++  ) => void;
++  warn: (...args: unknown[]) => void;
++  error: (...args: unknown[]) => void;
++  assert: (condition?: boolean, ...args: unknown[]) => void;
++  count: (label?: string) => void;
++  countReset: (label?: string) => void;
++  table: (data: unknown, properties?: string[] | undefined) => void;
++  time: (label?: string) => void;
++  timeLog: (label?: string, ...args: unknown[]) => void;
++  timeEnd: (label?: string) => void;
++  group: (...label: unknown[]) => void;
++  groupCollapsed: (...label: unknown[]) => void;
++  groupEnd: () => void;
++  clear: () => void;
++  trace: (...args: unknown[]) => void;
++  static [Symbol.hasInstance](instance: Console): boolean;
++}
++type FormDataEntryValue = File | string;
++interface FormData extends DomIterable<string, FormDataEntryValue> {
++  append(name: string, value: string | Blob, fileName?: string): void;
++  delete(name: string): void;
++  get(name: string): FormDataEntryValue | null;
++  getAll(name: string): FormDataEntryValue[];
++  has(name: string): boolean;
++  set(name: string, value: string | Blob, fileName?: string): void;
++}
++declare const FormData: {
++  prototype: FormData;
++  new (): FormData;
++};
++interface Body {
++  readonly body: ReadableStream<Uint8Array> | null;
++  readonly bodyUsed: boolean;
++  arrayBuffer(): Promise<ArrayBuffer>;
++  blob(): Promise<Blob>;
++  formData(): Promise<FormData>;
++  json(): Promise<any>;
++  text(): Promise<string>;
++}
++type HeadersInit = Headers | string[][] | Record<string, string>;
++interface Headers {
++  append(name: string, value: string): void;
++  delete(name: string): void;
++  get(name: string): string | null;
++  has(name: string): boolean;
++  set(name: string, value: string): void;
++  forEach(
++    callbackfn: (value: string, key: string, parent: Headers) => void,
++    thisArg?: any,
++  ): void;
++}
++interface Headers extends DomIterable<string, string> {
++  append(name: string, value: string): void;
++  delete(name: string): void;
++  entries(): IterableIterator<[string, string]>;
++  get(name: string): string | null;
++  has(name: string): boolean;
++  keys(): IterableIterator<string>;
++  set(name: string, value: string): void;
++  values(): IterableIterator<string>;
++  forEach(
++    callbackfn: (value: string, key: string, parent: this) => void,
++    thisArg?: any,
++  ): void;
++  [Symbol.iterator](): IterableIterator<[string, string]>;
++}
++declare const Headers: {
++  prototype: Headers;
++  new (init?: HeadersInit): Headers;
++};
++type RequestInfo = Request | string;
++type RequestCache =
++  | "default"
++  | "force-cache"
++  | "no-cache"
++  | "no-store"
++  | "only-if-cached"
++  | "reload";
++type RequestCredentials = "include" | "omit" | "same-origin";
++type RequestMode = "cors" | "navigate" | "no-cors" | "same-origin";
++type RequestRedirect = "error" | "follow" | "manual";
++type ReferrerPolicy =
++  | ""
++  | "no-referrer"
++  | "no-referrer-when-downgrade"
++  | "origin"
++  | "origin-when-cross-origin"
++  | "same-origin"
++  | "strict-origin"
++  | "strict-origin-when-cross-origin"
++  | "unsafe-url";
++type BodyInit =
++  | Blob
++  | BufferSource
++  | FormData
++  | URLSearchParams
++  | ReadableStream<Uint8Array>
++  | string;
++type RequestDestination =
++  | ""
++  | "audio"
++  | "audioworklet"
++  | "document"
++  | "embed"
++  | "font"
++  | "image"
++  | "manifest"
++  | "object"
++  | "paintworklet"
++  | "report"
++  | "script"
++  | "sharedworker"
++  | "style"
++  | "track"
++  | "video"
++  | "worker"
++  | "xslt";
++interface RequestInit {
++  body?: BodyInit | null;
++  cache?: RequestCache;
++  credentials?: RequestCredentials;
++  headers?: HeadersInit;
++  integrity?: string;
++  keepalive?: boolean;
++  method?: string;
++  mode?: RequestMode;
++  redirect?: RequestRedirect;
++  referrer?: string;
++  referrerPolicy?: ReferrerPolicy;
++  signal?: AbortSignal | null;
++  window?: any;
++}
++interface Request extends Body {
++  readonly cache: RequestCache;
++  readonly credentials: RequestCredentials;
++  readonly destination: RequestDestination;
++  readonly headers: Headers;
++  readonly integrity: string;
++  readonly isHistoryNavigation: boolean;
++  readonly isReloadNavigation: boolean;
++  readonly keepalive: boolean;
++  readonly method: string;
++  readonly mode: RequestMode;
++  readonly redirect: RequestRedirect;
++  readonly referrer: string;
++  readonly referrerPolicy: ReferrerPolicy;
++  readonly signal: AbortSignal;
++  readonly url: string;
++  clone(): Request;
++}
++declare const Request: {
++  prototype: Request;
++  new (input: RequestInfo, init?: RequestInit): Request;
++};
++type ResponseType =
++  | "basic"
++  | "cors"
++  | "default"
++  | "error"
++  | "opaque"
++  | "opaqueredirect";
++interface Response extends Body {
++  readonly headers: Headers;
++  readonly ok: boolean;
++  readonly redirected: boolean;
++  readonly status: number;
++  readonly statusText: string;
++  readonly trailer: Promise<Headers>;
++  readonly type: ResponseType;
++  readonly url: string;
++  clone(): Response;
++}
++declare const Response: {
++  prototype: Response;
++  new (
++    url: string,
++    status: number,
++    statusText: string,
++    headersList: Array<[string, string]>,
++    rid: number,
++    redirected_: boolean,
++    type_?: null | ResponseType,
++    body_?: null | Body,
++  ): Response;
++  error(): Response;
++  redirect(url: string, status?: number): Response;
++};
++declare function fetch(
++  input: Request | URL | string,
++  init?: RequestInit,
++): Promise<Response>;
++declare function atob(s: string): string;
++declare function btoa(s: string): string;
++declare class TextDecoder {
++  readonly encoding: string;
++  readonly fatal: boolean;
++  readonly ignoreBOM = false;
++  constructor(
++    label?: string,
++    options?: { fatal?: boolean; ignoreBOM?: boolean },
++  );
++  decode(input?: BufferSource, options?: { stream?: false }): string;
++  readonly [Symbol.toStringTag]: string;
++}
++declare class TextEncoder {
++  readonly encoding = "utf-8";
++  encode(input?: string): Uint8Array;
++  encodeInto(
++    input: string,
++    dest: Uint8Array,
++  ): { read: number; written: number };
++  readonly [Symbol.toStringTag]: string;
++}
++interface URLSearchParams {
++  append(name: string, value: string): void;
++  delete(name: string): void;
++  getAll(name: string): string[];
++  get(name: string): string | null;
++  has(name: string): boolean;
++  set(name: string, value: string): void;
++  sort(): void;
++  forEach(
++    callbackfn: (value: string, key: string, parent: this) => void,
++    thisArg?: any,
++  ): void;
++  keys(): IterableIterator<string>;
++  values(): IterableIterator<string>;
++  entries(): IterableIterator<[string, string]>;
++  [Symbol.iterator](): IterableIterator<[string, string]>;
++  toString(): string;
++}
++declare const URLSearchParams: {
++  prototype: URLSearchParams;
++  new (
++    init?: string[][] | Record<string, string> | string | URLSearchParams,
++  ): URLSearchParams;
++  toString(): string;
++};
++interface URL {
++  hash: string;
++  host: string;
++  hostname: string;
++  href: string;
++  toString(): string;
++  readonly origin: string;
++  password: string;
++  pathname: string;
++  port: string;
++  protocol: string;
++  search: string;
++  readonly searchParams: URLSearchParams;
++  username: string;
++  toJSON(): string;
++}
++declare const URL: {
++  prototype: URL;
++  new (url: string, base?: string | URL): URL;
++  createObjectURL(object: any): string;
++  revokeObjectURL(url: string): void;
++};
++interface MessageEventInit extends EventInit {
++  data?: any;
++  origin?: string;
++  lastEventId?: string;
++}
++declare class MessageEvent extends Event {
++  readonly data: any;
++  readonly origin: string;
++  readonly lastEventId: string;
++  constructor(type: string, eventInitDict?: MessageEventInit);
++}
++interface ErrorEventInit extends EventInit {
++  message?: string;
++  filename?: string;
++  lineno?: number;
++  colno?: number;
++  error?: any;
++}
++declare class ErrorEvent extends Event {
++  readonly message: string;
++  readonly filename: string;
++  readonly lineno: number;
++  readonly colno: number;
++  readonly error: any;
++  constructor(type: string, eventInitDict?: ErrorEventInit);
++}
++interface PostMessageOptions {
++  transfer?: any[];
++}
++declare class Worker extends EventTarget {
++  onerror?: (e: ErrorEvent) => void;
++  onmessage?: (e: MessageEvent) => void;
++  onmessageerror?: (e: MessageEvent) => void;
++  constructor(
++    specifier: string,
++    options?: {
++      type?: "classic" | "module";
++      name?: string;
++    },
++  );
++  postMessage(message: any, transfer: ArrayBuffer[]): void;
++  postMessage(message: any, options?: PostMessageOptions): void;
++  terminate(): void;
++}
++declare namespace performance {
++  export function now(): number;
++}
++interface EventInit {
++  bubbles?: boolean;
++  cancelable?: boolean;
++  composed?: boolean;
++}
++declare class Event {
++  constructor(type: string, eventInitDict?: EventInit);
++  readonly bubbles: boolean;
++  cancelBubble: boolean;
++  readonly cancelable: boolean;
++  readonly composed: boolean;
++  readonly currentTarget: EventTarget | null;
++  readonly defaultPrevented: boolean;
++  readonly eventPhase: number;
++  readonly isTrusted: boolean;
++  readonly target: EventTarget | null;
++  readonly timeStamp: number;
++  readonly type: string;
++  composedPath(): EventTarget[];
++  preventDefault(): void;
++  stopImmediatePropagation(): void;
++  stopPropagation(): void;
++  readonly AT_TARGET: number;
++  readonly BUBBLING_PHASE: number;
++  readonly CAPTURING_PHASE: number;
++  readonly NONE: number;
++  static readonly AT_TARGET: number;
++  static readonly BUBBLING_PHASE: number;
++  static readonly CAPTURING_PHASE: number;
++  static readonly NONE: number;
++}
++declare class EventTarget {
++  addEventListener(
++    type: string,
++    listener: EventListenerOrEventListenerObject | null,
++    options?: boolean | AddEventListenerOptions,
++  ): void;
++  dispatchEvent(event: Event): boolean;
++  removeEventListener(
++    type: string,
++    callback: EventListenerOrEventListenerObject | null,
++    options?: EventListenerOptions | boolean,
++  ): void;
++  [Symbol.toStringTag]: string;
++}
++interface EventListener {
++  (evt: Event): void | Promise<void>;
++}
++interface EventListenerObject {
++  handleEvent(evt: Event): void | Promise<void>;
++}
++declare type EventListenerOrEventListenerObject =
++  | EventListener
++  | EventListenerObject;
++interface AddEventListenerOptions extends EventListenerOptions {
++  once?: boolean;
++  passive?: boolean;
++}
++interface EventListenerOptions {
++  capture?: boolean;
++}
++interface ProgressEvent<T extends EventTarget = EventTarget> extends Event {
++  readonly lengthComputable: boolean;
++  readonly loaded: number;
++  readonly target: T | null;
++  readonly total: number;
++}
++interface CustomEventInit<T = any> extends EventInit {
++  detail?: T;
++}
++declare class CustomEvent<T = any> extends Event {
++  constructor(typeArg: string, eventInitDict?: CustomEventInit<T>);
++  readonly detail: T;
++}
++declare class AbortController {
++  readonly signal: AbortSignal;
++  abort(): void;
++}
++interface AbortSignalEventMap {
++  abort: Event;
++}
++interface AbortSignal extends EventTarget {
++  readonly aborted: boolean;
++  onabort: ((this: AbortSignal, ev: Event) => any) | null;
++  addEventListener<K extends keyof AbortSignalEventMap>(
++    type: K,
++    listener: (this: AbortSignal, ev: AbortSignalEventMap[K]) => any,
++    options?: boolean | AddEventListenerOptions,
++  ): void;
++  addEventListener(
++    type: string,
++    listener: EventListenerOrEventListenerObject,
++    options?: boolean | AddEventListenerOptions,
++  ): void;
++  removeEventListener<K extends keyof AbortSignalEventMap>(
++    type: K,
++    listener: (this: AbortSignal, ev: AbortSignalEventMap[K]) => any,
++    options?: boolean | EventListenerOptions,
++  ): void;
++  removeEventListener(
++    type: string,
++    listener: EventListenerOrEventListenerObject,
++    options?: boolean | EventListenerOptions,
++  ): void;
+ }
++declare const AbortSignal: {
++  prototype: AbortSignal;
++  new (): AbortSignal;
++};
+diff --git a/lib.deno.window.d.ts b/lib.deno.window.d.ts
+index aa000ab..c8da9fa 100644
+--- a/lib.deno.window.d.ts
++++ b/lib.deno.window.d.ts
+@@ -1,17 +1,18 @@
+-declare interface Window extends WindowOrWorkerGlobalScope {
+-  window: Window & WindowOrWorkerGlobalScope & typeof globalThis;
+-  self: Window & WindowOrWorkerGlobalScope & typeof globalThis;
+-  onload: Function | undefined;
+-  onunload: Function | undefined;
++declare interface Window extends EventTarget {
++  readonly window: Window & typeof globalThis;
++  readonly self: Window & typeof globalThis;
++  onload: ((this: Window, ev: Event) => any) | null;
++  onunload: ((this: Window, ev: Event) => any) | null;
++  location: Location;
+   crypto: Crypto;
+   close: () => void;
+-  closed: boolean;
++  readonly closed: boolean;
+   Deno: typeof Deno;
+ }
+-declare const window: Window & WindowOrWorkerGlobalScope & typeof globalThis;
+-declare const self: Window & WindowOrWorkerGlobalScope & typeof globalThis;
+-declare const onload: Function | undefined;
+-declare const onunload: Function | undefined;
++declare const window: Window & typeof globalThis;
++declare const self: Window & typeof globalThis;
++declare const onload: ((this: Window, ev: Event) => any) | null;
++declare const onunload: ((this: Window, ev: Event) => any) | null;
+ declare const crypto: Crypto;
+ declare interface Crypto {
+   readonly subtle: null;
+diff --git a/lib.deno.worker.d.ts b/lib.deno.worker.d.ts
+index 990d920..20d084a 100644
+--- a/lib.deno.worker.d.ts
++++ b/lib.deno.worker.d.ts
+@@ -1,16 +1,14 @@
+-declare interface DedicatedWorkerGlobalScope extends WindowOrWorkerGlobalScope {
+-  self: DedicatedWorkerGlobalScope
+-    & WindowOrWorkerGlobalScope
+-    & typeof globalThis;
+-  onmessage: (e: { data: any }) => void;
++declare interface DedicatedWorkerGlobalScope {
++  self: DedicatedWorkerGlobalScope & typeof globalThis;
++  onmessage: (e: MessageEvent) => void;
++  onmessageerror: (e: MessageEvent) => void;
++  location: Location;
+   onerror: undefined | typeof onerror;
+   name: typeof __workerMain.name;
+   close: typeof __workerMain.close;
+   postMessage: typeof __workerMain.postMessage;
+ }
+-declare const self: DedicatedWorkerGlobalScope
+-  & WindowOrWorkerGlobalScope
+-  & typeof globalThis;
++declare const self: DedicatedWorkerGlobalScope & typeof globalThis;
+ declare let onmessage: ((e: { data: any }) => Promise<void> | void) | undefined;
+ declare let onerror:
+   | ((
